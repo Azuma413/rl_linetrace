@@ -25,7 +25,7 @@ class MyEnv(gym.Env):
         self.count = 0
         
     def reset(self):
-        self.simulator = MySimulator()
+        self.simulator = MySimulator(obs_size=[self.obs_size, self.obs_size])
         obs, _, _ = self.simulator.simulate(np.array([0, 0]))
         self.count = 0
         return obs, {}
@@ -38,13 +38,19 @@ class MyEnv(gym.Env):
             done = True
         return obs, reward, done, {}
     
+    def observation_spec(self):
+        return self.observation_space
+
+    def action_spec(self):
+        return self.action_space
+    
     def render(self, mode='rgb_array'):
         return self.simulator.render()
 
 class MySimulator:
-    def __init__(self, init_pos=[360, 80]):
+    def __init__(self, init_pos=[360, 80], obs_size=[64, 64]):
         self.image_size = [560, 720]
-        self.obs_size = [64, 64]
+        self.obs_size = obs_size
         self.robot_pos = np.array(init_pos)
         update_rate = 20 # Hz
         max_speed = 300 # mm/s
@@ -113,12 +119,14 @@ class MySimulator:
                 else:
                     length = self.ranges[i] * (np.arctan2(self.robot_pos[1] - self.centers[i][1], self.robot_pos[0] - self.centers[i][0]) - np.arctan2(prior_pos[1] - self.centers[i][1], prior_pos[0] - self.centers[i][0]))
                     error = np.abs(np.sqrt((self.robot_pos[0] - self.centers[i][0])**2 + (self.robot_pos[1] - self.centers[i][1])**2) - self.ranges[i])
+                    if i == 1 or i == 3:
+                        length = -length
                 print("length: ", length)
                 print("error: ", error)
                 self.reward = length/self.max_length - np.tanh(error/10) # 3で1くらいになる
                 self.is_in_area = True
                 break
-        obs = self.obs_map[self.robot_pos[0]-self.obs_size[0]//2:self.robot_pos[0]+self.obs_size[0]//2, self.robot_pos[1]-self.obs_size[1]//2:self.robot_pos[1]+self.obs_size[1]//2]
+        obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
         # rewardを-1,1にclipする
         self.reward = np.clip(self.reward, -1, 1)
         return obs, self.reward, self.is_in_area
