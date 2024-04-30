@@ -50,9 +50,11 @@ class ReplayBufferStorage:
             value = time_step[spec.name]
             if np.isscalar(value):
                 value = np.full(spec.shape, value, spec.dtype)
+            # print(spec.name, spec.shape, value.shape, spec.dtype, value.dtype)
             assert spec.shape == value.shape and spec.dtype == value.dtype
             self._current_episode[spec.name].append(value)
-        if time_step.last():
+        # if time_step.last():
+        if time_step['done']:
             episode = dict()
             for spec in self._data_specs:
                 value = self._current_episode[spec.name]
