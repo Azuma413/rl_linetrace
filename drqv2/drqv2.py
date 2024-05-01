@@ -54,15 +54,15 @@ class Encoder(nn.Module):
         self.repr_dim = 20000
 
         self.convnet = nn.Sequential(nn.Conv2d(obs_shape[0], 32, 3, stride=2),
-                                     nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.ReLU())
+                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.GELU())
 
         self.apply(utils.weight_init)
 
     def forward(self, obs):
-        obs = obs / 255.0 - 0.5
+        obs = obs - 0.5
         h = self.convnet(obs)
         h = h.view(h.shape[0], -1)
         return h
@@ -76,9 +76,9 @@ class Actor(nn.Module):
                                    nn.LayerNorm(feature_dim), nn.Tanh())
 
         self.policy = nn.Sequential(nn.Linear(feature_dim, hidden_dim),
-                                    nn.ReLU(inplace=True),
+                                    nn.GELU(),
                                     nn.Linear(hidden_dim, hidden_dim),
-                                    nn.ReLU(inplace=True),
+                                    nn.GELU(),
                                     nn.Linear(hidden_dim, action_shape[0]))
 
         self.apply(utils.weight_init)
@@ -103,13 +103,13 @@ class Critic(nn.Module):
 
         self.Q1 = nn.Sequential(
             nn.Linear(feature_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
+            nn.GELU(), nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(), nn.Linear(hidden_dim, 1))
 
         self.Q2 = nn.Sequential(
             nn.Linear(feature_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
+            nn.GELU(), nn.Linear(hidden_dim, hidden_dim),
+            nn.GELU(), nn.Linear(hidden_dim, 1))
 
         self.apply(utils.weight_init)
 

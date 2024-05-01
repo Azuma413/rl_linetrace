@@ -103,13 +103,12 @@ class MySimulator:
         """
         action:正規化された[x, y]の速度ベクトル
         """
-        self.action = action
         prior_pos = self.robot_pos.copy()
         self.robot_pos += (self.max_length * action).astype(int)
         self.is_in_area = False
         self.reward = 0
         for i, area in enumerate(self.areas):
-            if area[0][0] < self.robot_pos[0] < area[0][1] and area[1][0] < self.robot_pos[1] < area[1][1]:
+            if area[0][0] <= self.robot_pos[0] < area[0][1] and area[1][0] <= self.robot_pos[1] < area[1][1]:
                 # robotがareaに入った時の処理
                 length = 0
                 error = 0
@@ -117,19 +116,34 @@ class MySimulator:
                     length = self.robot_pos[0] - prior_pos[0]
                     error = np.abs(self.robot_pos[1] - 80)
                 else:
-                    length = self.ranges[i] * (np.arctan2(self.robot_pos[1] - self.centers[i][1], self.robot_pos[0] - self.centers[i][0]) - np.arctan2(prior_pos[1] - self.centers[i][1], prior_pos[0] - self.centers[i][0]))
+                    theta = []
+                    theta.append(np.arctan2(self.robot_pos[1] - self.centers[i][1], self.robot_pos[0] - self.centers[i][0]))
+                    theta.append(np.arctan2(prior_pos[1] - self.centers[i][1], prior_pos[0] - self.centers[i][0]))
+                    for j in range(2):
+                        if theta[j] < 0:
+                            theta[j] += 2*np.pi
+                    length = self.ranges[i] * (theta[0] - theta[1])
                     error = np.abs(np.sqrt((self.robot_pos[0] - self.centers[i][0])**2 + (self.robot_pos[1] - self.centers[i][1])**2) - self.ranges[i])
                     if i == 1 or i == 3:
                         length = -length
-                print("length: ", length)
-                print("error: ", error)
-                self.reward = length/self.max_length - np.tanh(error/10) # 3で1くらいになる
+                self.reward = np.clip(length/self.max_length, -1, 1) - np.tanh(error/20)*2 # 3で1くらいになる
                 self.is_in_area = True
                 break
         obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
+        if not self.is_in_area:
+            self.reward = -1
+        if obs.shape != (self.obs_size[1], self.obs_size[0]):
+            self.is_in_area = False
+            self.reward = -1
+            # obsのサイズが合わない場合は白で埋める
+            obs = np.ones(self.obs_size)
         # rewardを-1,1にclipする
         self.reward = np.clip(self.reward, -1, 1)
-        return obs, self.reward, self.is_in_area
+        # まったく同じ行動を繰り返す場合は報酬を-1にする
+        # if np.all(action == self.action):
+        #     self.reward = -1
+        self.action = action
+        return obs, self.reward, not self.is_in_area
     
     def render(self):
         """
@@ -147,6 +161,8 @@ class MySimulator:
         image = cv2.flip(image, 0)
         # rewardを表示
         cv2.putText(image, 'reward: {:.2f}'.format(self.reward), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+        # 座標を表示
+        cv2.putText(image, 'x: {}, y: {}'.format(self.robot_pos[0], self.robot_pos[1]), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 衝突していたら文字を表示
         if not self.is_in_area:
             cv2.putText(image, 'out of area', (300, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
