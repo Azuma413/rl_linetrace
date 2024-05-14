@@ -1,7 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
@@ -17,7 +13,7 @@ import torch
 # import dmc
 import utils
 from video import VideoRecorder
-from my_simulator import MyEnv
+from my_controller import MyController
 
 torch.backends.cudnn.benchmark = True
 
@@ -39,7 +35,7 @@ class Workspace:
         self._global_step = 0
 
     def setup(self):
-        self.eval_env = MyEnv()
+        self.eval_env = MyController()
         self.video_recorder = VideoRecorder(Path(__file__).parent)
 
     @property
@@ -79,6 +75,7 @@ class Workspace:
 def main(cfg):
     workspace = Workspace(cfg)
     snapshot = Path(Path(__file__).parent, 'snapshot.pt')
+    # snapshot = Path("/home/desktop/Document/VScode/rl_linetrace/snapshot.pt")
     if snapshot.exists():
         print(f'resuming: {snapshot}')
         workspace.load_snapshot(snapshot)
