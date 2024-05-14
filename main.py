@@ -30,10 +30,16 @@ def control(speed):
         pwma.value = 0
         
 if __name__ == "__main__":
+    count = 0
+    flag = True
     while True:
-        control(0.5)
-        sleep(1)
-        control(-0.5)
-        sleep(1)
-        control(0)
-        sleep(1)
+        if count == 10:
+            flag = False
+        elif count == -10:
+            flag = True
+        control(count*0.1)
+        sleep(0.5)
+        if flag:
+            count += 1
+        else:
+            count -= 1
