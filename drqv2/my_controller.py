@@ -13,36 +13,43 @@ class MyController(gym.Env):
     def __init__(self, env_config=None):
         super(MyController, self).__init__()
         self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
-        self.obs_size = 64
+        self.obs_size = 64 # 観測画像のサイズ
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 1), dtype=np.float32)
-        self.reward_range = (-1, 1)
-        self.simulator = None
-        self.episode_length = 300
-        self.ain1 = DigitalOutputDevice(1)
-        self.ain2 = DigitalOutputDevice(2)
-        self.pwma = PWMOutputDevice(12)
-        self.bin1 = DigitalOutputDevice(3)
-        self.bin2 = DigitalOutputDevice(4)
-        self.pwmb = PWMOutputDevice(13)
-        self.cap = cv2.VideoCapture(0)
+        self.reward_range = (-1, 1) # rewardの範囲
+        self.simulator = None # シミュレータのインスタンスを保持する変数
+        self.ain1 = DigitalOutputDevice(1) # モーター1の制御ピン1
+        self.ain2 = DigitalOutputDevice(2) # モーター1の制御ピン2
+        self.pwma = PWMOutputDevice(12) # モーター1のPWM制御ピン
+        self.bin1 = DigitalOutputDevice(3) # モーター2の制御ピン1
+        self.bin2 = DigitalOutputDevice(4) # モーター2の制御ピン2
+        self.pwmb = PWMOutputDevice(13) # モーター2のPWM制御ピン
+        self.cap = cv2.VideoCapture(0) # カメラのキャプチャ
         self.action = None
         self.image = None
         
     def reset(self):
+        """
+        環境のリセット関数
+        """
+        # モーターを停止
         self.ain1.off()
         self.ain2.off()
         self.pwma.value = 0
         self.bin1.off()
         self.bin2.off()
         self.pwmb.value = 0
+        # 初期画像を取得
         obs = self.make_obs()
         return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
 
     def step(self, action):
-        self.control(action[0], 0)
-        self.control(action[0], 1)
-        obs = self.make_obs()
-        reward = 0
+        """
+        環境を1ステップ進める関数
+        """
+        self.control(action[0], 0) # モーター1を制御
+        self.control(action[0], 1) # モーター2を制御
+        obs = self.make_obs() # 観測を取得
+        reward = 0 # 学習はしないので報酬は0
         done = False
         self.action = action
         return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action.astype(np.float32)}
@@ -54,6 +61,9 @@ class MyController(gym.Env):
         return specs.BoundedArray(shape=(2,), dtype=np.float32, name='action', minimum=-1, maximum=1)
 
     def render(self, mode='rgb_array'):
+        """
+        記録用の画像を返す関数
+        """
         # action方向に矢印を描画
         if self.action is not None:
             frame = self.image.copy()
@@ -96,6 +106,9 @@ class MyController(gym.Env):
             raise ValueError("motor must be 0 or 1")
 
     def make_obs(self):
+        """
+        画像を取得して観測を作成する関数
+        """
         while True:
             ret, frame = self.cap.read()
             if not ret:

@@ -13,7 +13,7 @@ import torch
 # import dmc
 import utils
 from video import VideoRecorder
-from my_controller import MyController
+from my_controller import MyController # 実機制御用のGym環境をインポート
 
 torch.backends.cudnn.benchmark = True
 
@@ -35,7 +35,7 @@ class Workspace:
         self._global_step = 0
 
     def setup(self):
-        self.eval_env = MyController()
+        self.eval_env = MyController() # 実機制御用のGym環境をインスタンス化
         self.video_recorder = VideoRecorder(Path(__file__).parent)
 
     @property
@@ -74,11 +74,10 @@ class Workspace:
 @hydra.main(config_path='cfgs', config_name='config')
 def main(cfg):
     workspace = Workspace(cfg)
-    snapshot = Path(Path(__file__).parent, 'snapshot.pt')
-    # snapshot = Path("/home/desktop/Document/VScode/rl_linetrace/snapshot.pt")
+    snapshot = Path(Path(__file__).parent, 'snapshot.pt') # このファイルと同じディレクトリにsnapshot.ptがあると仮定
     if snapshot.exists():
         print(f'resuming: {snapshot}')
-        workspace.load_snapshot(snapshot)
+        workspace.load_snapshot(snapshot) # 学習済みモデルをロード
     workspace.eval()
 
 if __name__ == '__main__':
