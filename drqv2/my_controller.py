@@ -40,14 +40,16 @@ class MyController(gym.Env):
         self.pwmb.value = 0
         # 初期画像を取得
         obs = self.make_obs()
+        print("reset controller")
         return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
 
     def step(self, action):
         """
         環境を1ステップ進める関数
         """
+        print("action: ", action)
         self.control(action[0], 0) # モーター1を制御
-        self.control(action[0], 1) # モーター2を制御
+        self.control(action[1], 1) # モーター2を制御
         obs = self.make_obs() # 観測を取得
         reward = 0 # 学習はしないので報酬は0
         done = False
@@ -64,11 +66,14 @@ class MyController(gym.Env):
         """
         記録用の画像を返す関数
         """
+        frame = None
         # action方向に矢印を描画
         if self.action is not None:
             frame = self.image.copy()
             h, w = frame.shape[:2]
             cv2.arrowedLine(frame, (w//2, h//2), (w//2+int(self.action[0]*w//4), h//2+int(self.action[1]*w//4)), (255, 0, 0), 2)
+        else:
+            frame = np.zeros((self.obs_size, self.obs_size, 3), dtype=np.uint8)
         return frame
 
     def control(self, speed, motor):
@@ -126,4 +131,9 @@ class MyController(gym.Env):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # frameを2値化
             _, frame = cv2.threshold(frame, LINE_THREASHOLD, 255, cv2.THRESH_BINARY)
+            frame = frame.astype(np.float32) # 観測をfloat32に変換
+            # frameを正規化
+            frame /= 255
+            frame = 1 - frame # 白黒反転
+            frame = frame[None,:,:]
             return frame

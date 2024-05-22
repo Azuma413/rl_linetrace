@@ -88,8 +88,9 @@ Webカメラから取得した画像を観測としてAgentに渡し, Agentか�
 Ubuntuへのインストールを想定しています。(Windowsならwsl2を使うこと)
 ```
 git clone https://github.com/Azuma413/rl_linetrace.git
+python3 -m venv my_env
+pip install -r requirements.txt
 ```
-環境構築については`/drqv2/conda_env.yml`を使えば簡単に仮想環境を構築できるはずなのですが，なぜかその環境でコードを実行するとエラーが出るので，試行錯誤しながら環境構築するしかなさそうです。
 
 ### 実機動作(ラズパイ上で実行)
 windowsのターミナルからssh接続します。

@@ -66,13 +66,14 @@ class Workspace:
 
     def load_snapshot(self, snapshot: Path):
         with snapshot.open('rb') as f:
-            payload = torch.load(f)
+            payload = torch.load(f, map_location=self.device)
         for k, v in payload.items():
             self.__dict__[k] = v
 
 
 @hydra.main(config_path='cfgs', config_name='config')
 def main(cfg):
+    cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
     snapshot = Path(Path(__file__).parent, 'snapshot.pt') # このファイルと同じディレクトリにsnapshot.ptがあると仮定
     if snapshot.exists():
