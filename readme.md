@@ -89,7 +89,7 @@ Webカメラから取得した画像を観測としてAgentに渡し, Agentか�
 Ubuntuへのインストールを想定しています。(Windowsならwsl2を使うこと)
 ```
 git clone https://github.com/Azuma413/rl_linetrace.git
-python3 -m venv my_env
+python3 -m venv my_env --system-site-packages
 pip install -r requirements.txt
 ```
 
@@ -97,9 +97,7 @@ pip install -r requirements.txt
 windowsのターミナルからssh接続します。
 ```
 ssh raspi3@raspi3.local
-cd [this package path]
-source ~/rl_env/bin/activate
-python3 /drqv2/main.py
+sudo ~/my_env/bin/python3 ~/rl_linetrace/drqv2/main.py
 ```
 
 ### 評価(wsl2で実行)

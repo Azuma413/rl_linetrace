@@ -20,7 +20,7 @@ class MyController(gym.Env):
         self.ain1 = DigitalOutputDevice(24) # モーター1の制御ピン1
         self.ain2 = DigitalOutputDevice(23) # モーター1の制御ピン2
         self.pwma = PWMOutputDevice(18) # モーター1のPWM制御ピン
-        self.bin1 = DigitalOutputDevice(7) # モーター2の制御ピン1
+        self.bin1 = DigitalOutputDevice(25) # モーター2の制御ピン1
         self.bin2 = DigitalOutputDevice(1) # モーター2の制御ピン2
         self.pwmb = PWMOutputDevice(13) # モーター2のPWM制御ピン
         self.cap = cv2.VideoCapture(0) # カメラのキャプチャ
