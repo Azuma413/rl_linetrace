@@ -7,8 +7,8 @@ import numpy as np
 from dm_env import specs
 
 # 定数の宣言
-LINE_THREASHOLD = 128 # 画像の2値化の閾値 0-255の範囲で指定
-SHOW_IMAGE = True # 画像を表示するかどうか
+LINE_THREASHOLD = 100 # 画像の2値化の閾値 0-255の範囲で指定
+CHANGE_MOTOR = False # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -36,17 +36,17 @@ class MyController(gym.Env):
         self.action = None
         self.image = None
         
+    # デコンストラクタ
+    def __del__(self):
+        self.cap.release()
+        self.control([0, 0])
+        
     def reset(self):
         """
         環境のリセット関数
         """
         # モーターを停止
-        self.ain1.off()
-        self.ain2.off()
-        self.pwma.value = 0
-        self.bin1.off()
-        self.bin2.off()
-        self.pwmb.value = 0
+        self.control([0, 0])
         # 初期画像を取得
         obs = self.make_obs()
         print("reset controller")
@@ -55,10 +55,11 @@ class MyController(gym.Env):
     def step(self, action):
         """
         環境を1ステップ進める関数
+        action[0]: 右
+        action[1]: 前
         """
         print("action: ", action)
-        self.control(action[0], 0) # モーター1を制御
-        self.control(action[1], 1) # モーター2を制御
+        self.control(action) # モーターを制御
         obs = self.make_obs() # 観測を取得
         reward = 0 # 学習はしないので報酬は0
         done = False
@@ -85,39 +86,39 @@ class MyController(gym.Env):
             frame = np.zeros((self.obs_size, self.obs_size, 3), dtype=np.uint8)
         return frame
 
-    def control(self, speed, motor):
+    def control(self, action):
         """
         モーターを制御する関数
-        speed: -1~1の範囲でモーターの速度を指定
         """
-        if motor == 0:
-            if speed > 0:
-                self.ain1.on()
-                self.ain2.off()
-                self.pwma.value = speed
-            elif speed < 0:
-                self.ain1.off()
-                self.ain2.on()
-                self.pwma.value = -speed
-            else:
-                self.ain1.off()
-                self.ain2.off()
-                self.pwma.value = 0
-        elif motor == 1:
-            if speed > 0:
-                self.bin1.on()
-                self.bin2.off()
-                self.pwmb.value = speed
-            elif speed < 0:
-                self.bin1.off()
-                self.bin2.on()
-                self.pwmb.value = -speed
-            else:
-                self.bin1.off()
-                self.bin2.off()
-                self.pwmb.value = 0
+        speed = [-(action[0] + action[1])/np.sqrt(2), (action[0] - action[1])/np.sqrt(2)]
+        if CHANGE_MOTOR:
+            speed = speed[::-1]
+        # motor0 control
+        if speed[0] > 0:
+            self.ain1.on()
+            self.ain2.off()
+            self.pwma.value = speed[0]
+        elif speed[0] < 0:
+            self.ain1.off()
+            self.ain2.on()
+            self.pwma.value = -speed[0]
         else:
-            raise ValueError("motor must be 0 or 1")
+            self.ain1.off()
+            self.ain2.off()
+            self.pwma.value = 0
+        # motor1 control
+        if speed[1] > 0:
+            self.bin1.on()
+            self.bin2.off()
+            self.pwmb.value = speed[1]
+        elif speed[1] < 0:
+            self.bin1.off()
+            self.bin2.on()
+            self.pwmb.value = -speed[1]
+        else:
+            self.bin1.off()
+            self.bin2.off()
+            self.pwmb.value = 0
 
     def make_obs(self):
         """
