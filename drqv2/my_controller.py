@@ -8,6 +8,7 @@ from dm_env import specs
 
 # 定数の宣言
 LINE_THREASHOLD = 128 # 画像の2値化の閾値 0-255の範囲で指定
+SHOW_IMAGE = True # 画像を表示するかどうか
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -23,7 +24,15 @@ class MyController(gym.Env):
         self.bin1 = DigitalOutputDevice(25) # モーター2の制御ピン1
         self.bin2 = DigitalOutputDevice(1) # モーター2の制御ピン2
         self.pwmb = PWMOutputDevice(13) # モーター2のPWM制御ピン
-        self.cap = cv2.VideoCapture(0) # カメラのキャプチャ
+        # キャプチャに成功するまで繰り返す
+        camera_idx = 0
+        while True:
+            self.cap = cv2.VideoCapture(camera_idx)
+            if self.cap.isOpened():
+                print("camera{camera_idx} opened")
+                break
+            if camera_idx > 30:
+                raise ValueError("camera not found")
         self.action = None
         self.image = None
         
