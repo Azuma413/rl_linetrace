@@ -33,8 +33,10 @@ class MyController(gym.Env):
                 break
             if camera_idx > 30:
                 raise ValueError("camera not found")
-        self.action = None
+        self.action = np.array([0.0, 0.0])
         self.image = None
+        self.action_discount = 0.95
+        self.action_average = np.ones(2)
         
     # デコンストラクタ
     def __del__(self):
@@ -58,12 +60,12 @@ class MyController(gym.Env):
         action[0]: 右
         action[1]: 前
         """
+        self.action = action
         print("action: ", action)
         self.control(action) # モーターを制御
         obs = self.make_obs() # 観測を取得
         reward = 0 # 学習はしないので報酬は0
         done = False
-        self.action = action
         return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action.astype(np.float32)}
         
     def observation_spec(self):
@@ -145,5 +147,12 @@ class MyController(gym.Env):
             # frameを正規化
             frame /= 255
             frame = 1 - frame # 白黒反転
-            frame = frame[None,:,:]
+            
+            # ここから追加
+            self.action_average = self.action_average*self.action_discount + self.action*(1-self.action_discount)
+            frame = np.dstack([frame, np.zeros_like(frame)])
+            coord = [int(self.obs_size[0]//2 + 28*self.action_average[0]), int(self.obs_size[1]//2 + 28*self.action_average[1])]
+            frame[coord[1]-4:coord[1]+4, coord[0]-4:coord[0]+4, 1] = 1
+            frame = frame.astype(np.float32)
+            frame = np.transpose(frame, (2, 0, 1))
             return frame

@@ -109,7 +109,7 @@ class Workspace:
                     action = self.agent.act(time_step["observation"],
                                             self.global_step,
                                             eval_mode=True)
-                    print("action: ", action)
+                    # print("action: ", action)
                 time_step = self.eval_env.step(action)
                 self.video_recorder.record(self.eval_env)
                 total_reward += time_step["reward"]

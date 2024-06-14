@@ -13,7 +13,7 @@ from gym import spaces
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-# from dm_env import specs
+from dm_env import specs
 import pandas as pd
 from collections import deque
 
@@ -33,12 +33,16 @@ class MyEnv(gym.Env):
         obs, _ = self.simulator.simulate(np.array([0, 0])) # 初期観測を取得
         self.count = 0 # ステップ数をリセット
         obs = obs.astype(np.float32) # 観測をfloat32に変換
+        obs = np.transpose(obs, (2, 0, 1)) # [64,64,2]->[2,64,64]
         return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
     
     def step(self, action):
+        done = False
         self.count += 1 # ステップ数をカウント
         obs, reward = self.simulator.simulate(action) # シミュレータを1ステップ進める
         obs = obs.astype(np.float32) # 観測をfloat32に変換
+        # [64,64,2]->[2,64,64]
+        obs = np.transpose(obs, (2, 0, 1))
         if self.count >= self.episode_length: # 最大ステップ数に達したらdoneをTrueにする
             done = True
         return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action.astype(np.float32)}
@@ -227,7 +231,6 @@ class MySimulator2:
     def __init__(self, init_pos=[375, 125], obs_size=[64, 64]):
         self.image_size = [1000, 1000] # 画像のサイズ
         self.obs_size = obs_size # 観測画像のサイズ defalt 64*64
-        self.robot_pos = np.array(init_pos) # ロボットの初期位置
         update_rate = 5 # Hz ステップの更新頻度
         max_speed = 50 # mm/s ロボットの最大速度
         self.max_length = max_speed / update_rate # mm 1ステップで進む最大距離
@@ -236,9 +239,16 @@ class MySimulator2:
         self.reward = 0
         self.is_in_area = False
         # actionの更新割引率
-        self.action_discount = 0.9
-        self.action_average = np.array([1, 0])
+        self.action_discount = 0.95#0.95×#0.9×
+        self.action_average = np.ones(2) - 2*np.random.rand(2) # 進行方向の平均ベクトル
         self.action = np.array([0, 0])
+        init_poses = []
+        for area in self.areas:
+            if area.is_line:
+                # print('start: {}, end: {}'.format(area.start_pos, area.end_pos))
+                init_poses.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
+        # self.robot_pos = np.array(init_pos) # ロボットの初期位置
+        self.robot_pos = np.array(init_poses[np.random.randint(len(init_poses))], dtype=int)
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -316,7 +326,7 @@ class MySimulator2:
                 area_idx = [area_idx[0]-1, area_idx[1]]
             if area_idx[0]==0 and area_idx[1]==3:
                 self.areas.append(AreaInfo(area_idx, start_edge, 1, start_pos, 0.5, self.image_size))
-                print('finish to generate area data')
+                # print('finish to generate area data')
                 break
         image = np.ones(self.image_size)
         for area in self.areas:
@@ -328,7 +338,7 @@ class MySimulator2:
                     cv2.line(image, (int(area.line_edge[0]),int(area.line_edge[1])), (int(area.end_pos[0]),int(area.end_pos[1])), 0, line_thickness)
                 else:
                     cv2.line(image, (int(area.start_pos[0]),int(area.start_pos[1])), (int(area.line_edge[0]),int(area.line_edge[1])), 0, line_thickness)
-        print('finish to generate map')
+        # print('finish to generate map')
         return image
     
     def calc_reward(self, obs):
@@ -340,18 +350,22 @@ class MySimulator2:
         if np.linalg.norm(self.action) == 0 or np.linalg.norm(self.action_average) == 0:
             reward += 0
         else:
-            reward += np.dot(self.action/np.linalg.norm(self.action), self.action_average/np.linalg.norm(self.action_average))/2
+            # reward += np.dot(self.action/np.linalg.norm(self.action), self.action_average/np.linalg.norm(self.action_average))/2
+            reward += np.dot(self.action, self.action_average)
         # 2. 進行方向ベクトルのノルムを最大速度で割った値を報酬とする
-        reward += np.linalg.norm(self.action)/self.max_length/2
+        # reward += np.linalg.norm(self.action)/self.max_length/2
         # 3. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
         # このとき黒ピクセルが全く存在しなければ，報酬は絶対に-1として終了
-        if np.sum(obs) == self.obs_size[0]*self.obs_size[1]:
+        if np.sum(obs == 0) == 0:
+            print('no black pixel')
             return -1
         else:
             black_pixels = np.where(obs == 0) # 黒ピクセルの座標を取得
             black_center = np.array([np.mean(black_pixels[1]), np.mean(black_pixels[0])]) # 黒ピクセルの中心座標
             image_center = np.array([self.obs_size[0]//2, self.obs_size[1]//2]) # 画像の中心座標
             reward -= np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center) # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
+        # rewardを-1から1の範囲に収める
+        reward = np.clip(reward, -1, 1)
         return reward
 
     def simulate(self, action):
@@ -398,7 +412,7 @@ class MySimulator2:
         """
         image = np.zeros([self.image_size[0], self.image_size[1], 3])
         image[:,:,:] = self.obs_map[:,:,None] * 255
-        cv2.drawMarker(image, (360, 80), (0, 0, 0), cv2.MARKER_CROSS, 40, 10)
+        cv2.drawMarker(image, (375, 125), (0, 0, 0), cv2.MARKER_CROSS, 40, 10)
         cv2.circle(image, tuple(self.robot_pos), 10, (0, 255, 0), -1)
         # 観測範囲を表示
         cv2.rectangle(image, (self.robot_pos[0]-self.obs_size[0]//2, self.robot_pos[1]-self.obs_size[1]//2), (self.robot_pos[0]+self.obs_size[0]//2, self.robot_pos[1]+self.obs_size[1]//2), (0, 0, 255), 2)

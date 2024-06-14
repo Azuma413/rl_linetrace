@@ -32,6 +32,7 @@ class VideoRecorder:
                                            camera_id=0)
             else:
                 frame = env.render()
+                frame = frame.astype(np.uint8)
             self.frames.append(frame)
 
     def save(self, file_name):
