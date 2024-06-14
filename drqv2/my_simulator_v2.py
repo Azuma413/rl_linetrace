@@ -17,9 +17,9 @@ from dm_env import specs
 import pandas as pd
 from collections import deque
 
-class MyEnv(gym.Env):
+class MyEnv2(gym.Env):
     def __init__(self, env_config=None):
-        super(MyEnv, self).__init__()
+        super(MyEnv2, self).__init__()
         self.action_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)
         self.obs_size = 64 # 観測画像のサイズ
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 2), dtype=np.float32)
@@ -228,8 +228,8 @@ class MySimulator2:
     ・観測のyaw方向のノイズを追加(回転させる)
     ・観測のpitch方向のノイズを追加(観測範囲を拡張してからリサイズ)
     """
-    def __init__(self, init_pos=[375, 125], obs_size=[64, 64]):
-        self.image_size = [1000, 1000] # 画像のサイズ
+    def __init__(self, obs_size=[64, 64]):
+        self.image_size = [1000, 1000] # mapのサイズ
         self.obs_size = obs_size # 観測画像のサイズ defalt 64*64
         update_rate = 5 # Hz ステップの更新頻度
         max_speed = 50 # mm/s ロボットの最大速度
@@ -239,17 +239,19 @@ class MySimulator2:
         self.reward = 0
         self.is_in_area = False
         # actionの更新割引率
-        self.action_discount = 0.95#0.95×#0.9×
-        self.action_average = np.ones(2) - 2*np.random.rand(2) # 進行方向の平均ベクトル
-        self.action = np.array([0, 0])
-        init_poses = []
+        self.action_discount = 0.95# 例えば0.9ならactionに0.1をかけてaction_averageを更新
+        self.action_average = 0 # ロボットのx軸方向を0度とした時の，進行方向の重み付け平均
+        self.action = 0 # self.action_averageの方向を0度とした時の進行方向の角度
+        init_pos_list = []
         for area in self.areas:
             if area.is_line:
                 # print('start: {}, end: {}'.format(area.start_pos, area.end_pos))
-                init_poses.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
+                init_pos_list.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
         # self.robot_pos = np.array(init_pos) # ロボットの初期位置
-        self.robot_pos = np.array(init_poses[np.random.randint(len(init_poses))], dtype=int)
-        self.obs = None
+        self.robot_pos = np.array(init_pos_list[np.random.randint(len(init_pos_list))], dtype=int)
+        self.obs = None # 観測画像を保持する変数
+        self.robot_yaw = 0 # ロボットの回転角度
+        self.robot_pitch = 0 # ロボットの仰角
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -342,51 +344,49 @@ class MySimulator2:
         # print('finish to generate map')
         return image
     
-    def calc_reward(self, obs):
+    def calc_reward(self):
         """
         ３つ合わせて-1から1の範囲に収まるように調整すること。
         """
         reward = 0
-        # 1. 正規化した進行方向ベクトルの内積を報酬とする
-        if np.linalg.norm(self.action) == 0 or np.linalg.norm(self.action_average) == 0:
-            reward += 0
-        else:
-            # reward += np.dot(self.action/np.linalg.norm(self.action), self.action_average/np.linalg.norm(self.action_average))/2
-            reward += np.dot(self.action, self.action_average)
-        # 2. 進行方向ベクトルのノルムを最大速度で割った値を報酬とする
-        # reward += np.linalg.norm(self.action)/self.max_length/2
-        # 3. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
-        # このとき黒ピクセルが全く存在しなければ，報酬は絶対に-1として終了
-        if np.sum(obs == 0) == 0:
+        # 1. actionの絶対値に基づく報酬
+        reward += (0.5 - np.abs(self.action)) # -0.5~0.5の範囲
+        # 2. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
+        if np.sum(self.obs[:,:,0] == 0) == 0:
             print('no black pixel')
             return -1
         else:
-            black_pixels = np.where(obs == 0) # 黒ピクセルの座標を取得
+            black_pixels = np.where(self.obs[:,:,0] == 0) # 黒ピクセルの座標を取得
             black_center = np.array([np.mean(black_pixels[1]), np.mean(black_pixels[0])]) # 黒ピクセルの中心座標
             image_center = np.array([self.obs_size[0]//2, self.obs_size[1]//2]) # 画像の中心座標
-            reward -= np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center) # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
+            # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
+            reward += (0.5 - np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center)) # -1~1の範囲
         # rewardを-1から1の範囲に収める
         reward = np.clip(reward, -1, 1)
         return reward
 
     def simulate(self, action):
         """
-        action:正規化された[x, y]の速度ベクトル
-        calc_rewardを実装したら，そちらに置き換える事
-        map外に出ると罰則を与えてトレーニングを終了とすると，損切り的な行動を学習する可能性があるので，これを許さない。
-        復帰性能も上げたい場合はどのように訓練すべきだろうか？
+        シミュレーションを1ステップ進める関数
         """
-        self.action = action
-        self.reward = 0
-        self.is_in_area = True
-        new_pos = self.robot_pos + (self.max_length * action).astype(int)
-        # ロボットの位置が画像の範囲内かどうかを判定
+        self.action = action # actionを更新
+        self.action_average = self.action_average + action*(1-self.action_discount) # action_averageを更新
+        # ロボットの位置を更新
+        theta = self.robot_yaw + self.action_average + self.action
+        new_pos = self.robot_pos + (self.max_length * np.array([np.cos(theta), np.sin(theta)])).astype(int)
+        self.is_in_area = True # 画像の範囲内にいるかどうかを示すフラグ
         if 0 <= new_pos[0] < self.image_size[0] and 0 <= new_pos[1] < self.image_size[1]:
-            self.robot_pos = new_pos
-        else: # 画像の範囲外に出た場合
-            self.is_in_area = False
+            self.robot_pos = new_pos # new_posが画像の範囲内ならロボットの位置を更新
+        else: # 画像の範囲外に出た場合はロボットの位置を更新しない
+            self.is_in_area = False # 画像の範囲外に出たことを示すフラグを立てる
+        # 観測を更新
+        # self.obs_mapからrobot_posを中心としてrobot_yaw回転した，obs_sizeの範囲を切り取る
+        
+        
+        self.reward = 0
+        
+        
         # 観測を取得
-        obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
         if obs.shape != (self.obs_size[1], self.obs_size[0]):
             # obsのサイズが合わない（=マップからはみ出している）場合は白で埋める
             obs = np.ones(self.obs_size)
@@ -395,7 +395,7 @@ class MySimulator2:
         # pitch方向のノイズを追加
         
         
-        self.action_average = self.action_average*self.action_discount + action*(1-self.action_discount)
+        
         # 進行方向を示す観測を追加
         obs = np.dstack([obs, np.zeros_like(obs)])
         coord = [int(self.obs_size[0]//2 + 28*self.action_average[0]), int(self.obs_size[1]//2 + 28*self.action_average[1])]

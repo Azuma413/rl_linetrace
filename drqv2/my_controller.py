@@ -77,6 +77,7 @@ class MyController(gym.Env):
     def render(self, mode='rgb_array'):
         """
         記録用の画像を返す関数
+        obsも見れるようにしたい。
         """
         frame = None
         # action方向に矢印を描画

@@ -22,6 +22,8 @@ def make_agent(obs_spec, action_spec, cfg):
     cfg.action_shape = action_spec.shape
     return hydra.utils.instantiate(cfg)
 
+# 動画出力がうまく行っていないようなので確認すること
+
 class Workspace:
     def __init__(self, cfg):
         self.cfg = cfg
