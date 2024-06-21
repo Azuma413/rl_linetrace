@@ -253,6 +253,11 @@ class MySimulator2:
         self.robot_yaw = 0 # ロボットの回転角度
         self.robot_pitch = 0 # ロボットの仰角
         self.prior_pos = self.robot_pos
+        self.use_mark_action_obs = False # アクションをマークとして与えるか。Falseならグレー画像として与える。
+        self.use_average_reward = True # 平均のactionを報酬として用いる
+        self.use_action_diff_reward = True # 前回のactionとの誤差を報酬として用いる
+        
+        self.prior_action = 0
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -351,7 +356,8 @@ class MySimulator2:
         """
         reward = 0
         # 1. actionの絶対値に基づく報酬
-        reward += (0.5 - np.abs(self.action)) # -0.5~0.5の範囲
+        b = 2
+        reward += (0.5 - np.abs(self.action)**b) # -0.5~0.5の範囲
         # 2. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
         if np.sum(self.obs[:,:,0] == 0) == 0:
             print('no black pixel')
@@ -362,6 +368,8 @@ class MySimulator2:
             image_center = np.array([self.obs_size[0]//2, self.obs_size[1]//2]) # 画像の中心座標
             # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
             reward += (0.5 - np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center)) # -1~1の範囲
+        # 3. actionの誤差に基づく報酬
+        reward -= (self.prior_action - self.action)**2
         # rewardを-1から1の範囲に収める
         reward = np.clip(reward, -1, 1)
         return reward
@@ -399,8 +407,13 @@ class MySimulator2:
         # pitch方向のノイズを追加
         
         # 進行方向を示す観測を追加
+        obs = None
         obs = np.dstack([obs, np.zeros_like(obs)])
-        obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
+        if self.use_mark_action_obs:
+            # 実装する
+            pass
+        else:
+            obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
         self.obs = obs
 
         # rewardを計算
@@ -409,6 +422,7 @@ class MySimulator2:
             self.reward = self.calc_reward()
         else:
             self.reward = -1
+        self.prior_action = self.action
         return obs, self.reward
     
     def render(self):

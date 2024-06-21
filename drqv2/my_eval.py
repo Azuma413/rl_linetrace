@@ -17,7 +17,8 @@ import torch
 # import dmc
 import utils
 from video import VideoRecorder
-from my_simulator import MyEnv
+# from my_simulator import MyEnv
+from my_simulator_v2 import MyEnv2
 
 torch.backends.cudnn.benchmark = True
 
@@ -39,7 +40,7 @@ class Workspace:
         self._global_step = 0
 
     def setup(self):
-        self.eval_env = MyEnv()
+        self.eval_env = MyEnv2()
         self.video_recorder = VideoRecorder(Path(__file__).parent)
 
     @property

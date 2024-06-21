@@ -101,16 +101,15 @@ sudo ~/my_env/bin/python3 ~/rl_linetrace/drqv2/main.py
 ```
 
 ### 評価(wsl2で実行)
-`jax_env`はanacondaの仮想環境です。適宜自分の環境名に置き換えてください。
 ```
-cd [this package path]
-conda activate jax_env
+cd ~/rl_linetrace/drqv2
+source ~/my_env/bin/activate
 python my_eval.py
 ```
 
 ### トレーニング(wsl2で実行)
 ```
-cd [this package path]
-conda activate jax_env
+cd ~/rl_linetrace/drqv2
+source ~/my_env/bin/activate
 python train.py
 ```
