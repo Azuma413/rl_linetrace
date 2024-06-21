@@ -379,7 +379,7 @@ class MySimulator2:
             self.action_average += 2
         # ロボットの位置を更新
         theta = self.robot_yaw + (self.action_average + self.action)*np.pi
-        print(f"theta:{theta*180/np.pi}")
+        # print(f"theta:{theta*180/np.pi}")
         new_pos = self.robot_pos + (self.max_length * np.array([np.cos(theta), np.sin(theta)])).astype(int)
         self.is_in_area = True # 画像の範囲内にいるかどうかを示すフラグ
         if 0 <= new_pos[0] < self.image_size[0] and 0 <= new_pos[1] < self.image_size[1]:
