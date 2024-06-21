@@ -18,7 +18,8 @@ from logger import Logger
 from replay_buffer import ReplayBufferStorage, make_replay_loader
 from video import TrainVideoRecorder, VideoRecorder
 
-from my_simulator import MyEnv
+#from my_simulator import MyEnv
+from my_simulator_v2 import MyEnv2
 
 torch.backends.cudnn.benchmark = True
 
@@ -55,8 +56,8 @@ class Workspace:
         #                             self.cfg.action_repeat, self.cfg.seed)
         
         # 設定を上書き
-        self.train_env = MyEnv()
-        self.eval_env = MyEnv()
+        self.train_env = MyEnv2()
+        self.eval_env = MyEnv2()
         
         # create replay buffer
         data_specs = (self.train_env.observation_spec(),

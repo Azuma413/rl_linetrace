@@ -20,7 +20,7 @@ from collections import deque
 class MyEnv2(gym.Env):
     def __init__(self, env_config=None):
         super(MyEnv2, self).__init__()
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         self.obs_size = 64 # 観測画像のサイズ
         self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 2), dtype=np.float32)
         self.reward_range = (-1, 1) # rewardの範囲
@@ -29,29 +29,29 @@ class MyEnv2(gym.Env):
         self.count = 0 # 現在のステップ数
         
     def reset(self):
-        self.simulator = MySimulator2(init_pos=[375, 125], obs_size=[self.obs_size, self.obs_size]) # 初期座標を変更する場合 
-        obs, _ = self.simulator.simulate(np.array([0, 0])) # 初期観測を取得
+        self.simulator = MySimulator2(obs_size=[self.obs_size, self.obs_size]) # 初期座標を変更する場合 
+        obs, _ = self.simulator.simulate(0) # 初期観測を取得
         self.count = 0 # ステップ数をリセット
         obs = obs.astype(np.float32) # 観測をfloat32に変換
         obs = np.transpose(obs, (2, 0, 1)) # [64,64,2]->[2,64,64]
-        return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
+        return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0]).astype(np.float32)}
     
     def step(self, action):
         done = False
         self.count += 1 # ステップ数をカウント
-        obs, reward = self.simulator.simulate(action) # シミュレータを1ステップ進める
+        obs, reward = self.simulator.simulate(action[0]) # シミュレータを1ステップ進める
         obs = obs.astype(np.float32) # 観測をfloat32に変換
         # [64,64,2]->[2,64,64]
         obs = np.transpose(obs, (2, 0, 1))
         if self.count >= self.episode_length: # 最大ステップ数に達したらdoneをTrueにする
             done = True
-        return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action.astype(np.float32)}
+        return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action}
     
     def observation_spec(self):
         return specs.Array(shape=(2, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
 
     def action_spec(self):
-        return specs.BoundedArray(shape=(2,), dtype=np.float32, name='action', minimum=-1, maximum=1)
+        return specs.BoundedArray(shape=(1,), dtype=np.float32, name='action', minimum=-1, maximum=1)
     
     def render(self, mode='rgb_array'):
         return self.simulator.render() # シミュレータのrender関数を呼び出す
@@ -252,6 +252,7 @@ class MySimulator2:
         self.obs = None # 観測画像を保持する変数
         self.robot_yaw = 0 # ロボットの回転角度
         self.robot_pitch = 0 # ロボットの仰角
+        self.prior_pos = self.robot_pos
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -369,10 +370,16 @@ class MySimulator2:
         """
         シミュレーションを1ステップ進める関数
         """
-        self.action = action # actionを更新
+        self.prior_pos = self.robot_pos
+        self.action = action*0.1 # actionを更新 0.1を掛けると進行方向が制限される。
         self.action_average = self.action_average + action*(1-self.action_discount) # action_averageを更新
+        if self.action_average > 1:
+            self.action_average -= 2
+        elif self.action_average < -1:
+            self.action_average += 2
         # ロボットの位置を更新
-        theta = self.robot_yaw + self.action_average + self.action
+        theta = self.robot_yaw + (self.action_average + self.action)*np.pi
+        print(f"theta:{theta*180/np.pi}")
         new_pos = self.robot_pos + (self.max_length * np.array([np.cos(theta), np.sin(theta)])).astype(int)
         self.is_in_area = True # 画像の範囲内にいるかどうかを示すフラグ
         if 0 <= new_pos[0] < self.image_size[0] and 0 <= new_pos[1] < self.image_size[1]:
@@ -381,10 +388,7 @@ class MySimulator2:
             self.is_in_area = False # 画像の範囲外に出たことを示すフラグを立てる
         # 観測を更新
         # self.obs_mapからrobot_posを中心としてrobot_yaw回転した，obs_sizeの範囲を切り取る
-        
-        
-        self.reward = 0
-        
+        obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
         
         # 観測を取得
         if obs.shape != (self.obs_size[1], self.obs_size[0]):
@@ -394,18 +398,17 @@ class MySimulator2:
         
         # pitch方向のノイズを追加
         
-        
-        
         # 進行方向を示す観測を追加
         obs = np.dstack([obs, np.zeros_like(obs)])
-        coord = [int(self.obs_size[0]//2 + 28*self.action_average[0]), int(self.obs_size[1]//2 + 28*self.action_average[1])]
-        obs[coord[1]-4:coord[1]+4, coord[0]-4:coord[0]+4, 1] = 1
+        obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
+        self.obs = obs
+
         # rewardを計算
+        self.reward = 0
         if self.is_in_area:
-            self.reward = self.calc_reward(obs)
+            self.reward = self.calc_reward()
         else:
             self.reward = -1
-        self.obs = obs
         return obs, self.reward
     
     def render(self):
@@ -419,15 +422,19 @@ class MySimulator2:
         # 観測範囲を表示
         cv2.rectangle(image, (self.robot_pos[0]-self.obs_size[0]//2, self.robot_pos[1]-self.obs_size[1]//2), (self.robot_pos[0]+self.obs_size[0]//2, self.robot_pos[1]+self.obs_size[1]//2), (0, 0, 255), 2)
         # 進行方向を表示
-        cv2.arrowedLine(image, tuple(self.robot_pos), tuple(self.robot_pos + (self.max_length*self.action).astype(int)), (255, 0, 0), 2)
+        cv2.arrowedLine(image, tuple(self.prior_pos), tuple(self.robot_pos), (255, 0, 0), 2)
         # 上下反転
         image = cv2.flip(image, 0)
         # 画像の右上に1chずつobsを表示
         for i in range(2):
             obs = self.obs[:,:,i]
-            obs = cv2.resize(obs, (64, 64), interpolation=cv2.INTER_NEAREST)
-            obs = np.dstack([obs, np.zeros_like(obs), np.zeros_like(obs)]) * 255
-            image[:64, self.image_size[1]-64*(i+1):self.image_size[1]-64*i] = obs
+            obs = cv2.resize(obs, (128, 128), interpolation=cv2.INTER_NEAREST)
+            if i == 0:
+                obs = np.dstack([np.zeros_like(obs), obs, obs])
+            if i == 1:
+                obs = (obs + 1)/2 # 0~1にする
+                obs = np.dstack([obs, obs, obs])
+            image[:128, self.image_size[1]-128*(i+1):self.image_size[1]-128*i] = obs*255
         # rewardを表示
         cv2.putText(image, 'reward: {:.2f}'.format(self.reward), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 座標を表示
