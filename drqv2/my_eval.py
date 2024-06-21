@@ -17,7 +17,7 @@ import torch
 # import dmc
 import utils
 from video import VideoRecorder
-from my_simulator import MyEnv
+from my_simulator_v2 import MyEnv2
 
 torch.backends.cudnn.benchmark = True
 
@@ -39,7 +39,7 @@ class Workspace:
         self._global_step = 0
 
     def setup(self):
-        self.eval_env = MyEnv()
+        self.eval_env = MyEnv2()
         self.video_recorder = VideoRecorder(Path(__file__).parent)
 
     @property
@@ -79,7 +79,7 @@ class Workspace:
 def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
-    snapshot = Path(Path(__file__).parent, 'wheight1.pt')
+    snapshot = Path(Path(__file__).parent, 'wheight2.pt')
     if snapshot.exists():
         print(f'resuming: {snapshot}')
         workspace.load_snapshot(snapshot)
