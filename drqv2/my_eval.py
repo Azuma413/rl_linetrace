@@ -81,7 +81,7 @@ class Workspace:
 def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
-    snapshot = Path(Path(__file__).parent, 'wheight2.pt')
+    snapshot = Path(Path(__file__).parent, 'weight2.pt')
     print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
