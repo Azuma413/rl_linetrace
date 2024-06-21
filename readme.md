@@ -88,9 +88,12 @@ Webカメラから取得した画像を観測としてAgentに渡し, Agentか�
 ### インストール
 Ubuntuへのインストールを想定しています。(Windowsならwsl2を使うこと)
 ```
+cd
 git clone https://github.com/Azuma413/rl_linetrace.git
+sudo rm -rf my_env
 python3 -m venv my_env --system-site-packages
-pip install -r requirements.txt
+source my_env/bin/activate
+pip install -r rl_linetrace/requirements.txt
 ```
 
 ### 実機動作(ラズパイ上で実行)
