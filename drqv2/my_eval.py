@@ -40,6 +40,7 @@ class Workspace:
 
     def setup(self):
         self.eval_env = MyEnv2()
+        print("root:", Path(__file__).parent)
         self.video_recorder = VideoRecorder(Path(__file__).parent)
 
     @property
@@ -67,6 +68,7 @@ class Workspace:
 
         episode += 1
         self.video_recorder.save(f'{self.global_frame}.mp4')
+        print(f'name: {self.global_frame}.mp4')
 
     def load_snapshot(self, snapshot: Path):
         with snapshot.open('rb') as f:
