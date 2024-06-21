@@ -88,9 +88,12 @@ Webカメラから取得した画像を観測としてAgentに渡し, Agentか�
 ### インストール
 Ubuntuへのインストールを想定しています。(Windowsならwsl2を使うこと)
 ```
+cd
 git clone https://github.com/Azuma413/rl_linetrace.git
+sudo rm -rf my_env
 python3 -m venv my_env --system-site-packages
-pip install -r requirements.txt
+source my_env/bin/activate
+pip install -r rl_linetrace/requirements.txt
 ```
 
 ### 実機動作(ラズパイ上で実行)
@@ -103,14 +106,14 @@ sudo ~/my_env/bin/python3 ~/rl_linetrace/drqv2/main.py
 ### 評価(wsl2で実行)
 `jax_env`はanacondaの仮想環境です。適宜自分の環境名に置き換えてください。
 ```
-cd [this package path]
-conda activate jax_env
+cd ~/rl_linetrace/drqv2
+source ~/my_env/bin/activate
 python my_eval.py
 ```
 
 ### トレーニング(wsl2で実行)
 ```
-cd [this package path]
-conda activate jax_env
-python train.py
+cd ~/rl_linetrace/drqv2
+source ~/my_env/bin/activate
+python my_train.py
 ```
