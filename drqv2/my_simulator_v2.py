@@ -388,17 +388,20 @@ class MySimulator2:
         else: # 画像の範囲外に出た場合はロボットの位置を更新しない
             self.is_in_area = False # 画像の範囲外に出たことを示すフラグを立てる
         # 観測を更新
+        # yaw方向のノイズを追加
+        self.robot_yaw = np.random.uniform(-self.max_yaw_noise, self.max_yaw_noise)
+        # pitch方向のノイズを追加
+        self.robot_pitch = np.random.uniform(-self.max_pitch_noise, self.max_pitch_noise)
         # self.obs_mapからrobot_posを中心としてrobot_yaw回転した，obs_sizeの範囲を切り取る
-        obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
-        
-        # 観測を取得
+        obs_height = self.obs_size[0] * (150 - 90*np.cos(self.robot_pitch))*(np.tan(np.pi/4 - self.robot_pitch) + np.tan(np.pi/4 + self.robot_pitch))/120
+        print("obs_height", obs_height)
+        obs = cv2.warpAffine(self.obs_map, cv2.getRotationMatrix2D(tuple(self.robot_pos.astype(np.float32)), self.robot_yaw*180/np.pi, 1), (self.image_size[1], int(obs_height))) # 回転行列を用いてaffine変換
+        # obsをリサイズ
+        obs = cv2.resize(obs, (self.obs_size[0], self.obs_size[1]), interpolation=cv2.INTER_NEAREST)
         if obs.shape != (self.obs_size[1], self.obs_size[0]):
             # obsのサイズが合わない（=マップからはみ出している）場合は白で埋める
             obs = np.ones(self.obs_size)
-        # yaw方向のノイズを追加
-        
-        # pitch方向のノイズを追加
-        
+
         # 進行方向を示す観測を追加
         obs = np.dstack([obs, np.zeros_like(obs)])
         obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
