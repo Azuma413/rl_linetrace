@@ -388,17 +388,11 @@ class MySimulator2:
         else: # 画像の範囲外に出た場合はロボットの位置を更新しない
             self.is_in_area = False # 画像の範囲外に出たことを示すフラグを立てる
         # 観測を更新
-        # self.obs_mapからrobot_posを中心としてrobot_yaw回転した，obs_sizeの範囲を切り取る
         obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
-        
         # 観測を取得
         if obs.shape != (self.obs_size[1], self.obs_size[0]):
             # obsのサイズが合わない（=マップからはみ出している）場合は白で埋める
             obs = np.ones(self.obs_size)
-        # yaw方向のノイズを追加
-        
-        # pitch方向のノイズを追加
-        
         # 進行方向を示す観測を追加
         obs = np.dstack([obs, np.zeros_like(obs)])
         obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
@@ -435,11 +429,14 @@ class MySimulator2:
             if i == 1:
                 obs = (obs + 1)/2 # 0~1にする
                 obs = np.dstack([obs, obs, obs])
+            obs = cv2.flip(obs, 0)
             image[:128, self.image_size[1]-128*(i+1):self.image_size[1]-128*i] = obs*255
         # rewardを表示
         cv2.putText(image, 'reward: {:.2f}'.format(self.reward), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 座標を表示
         cv2.putText(image, 'x: {}, y: {}'.format(self.robot_pos[0], self.robot_pos[1]), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+        # actionを表示
+        cv2.putText(image, 'action: {:.2f}'.format(self.action), (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 衝突していたら文字を表示
         if not self.is_in_area:
             cv2.putText(image, 'out of area', (300, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
