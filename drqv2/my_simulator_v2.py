@@ -245,14 +245,15 @@ class MySimulator2:
         init_pos_list = []
         for area in self.areas:
             if area.is_line:
-                # print('start: {}, end: {}'.format(area.start_pos, area.end_pos))
                 init_pos_list.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
-        # self.robot_pos = np.array(init_pos) # ロボットの初期位置
         self.robot_pos = np.array(init_pos_list[np.random.randint(len(init_pos_list))], dtype=int)
         self.obs = None # 観測画像を保持する変数
         self.robot_yaw = 0 # ロボットの回転角度
+        self.max_yaw_noise = 30*np.pi/180 # yawノイズの最大値(ラジアン)
         self.robot_pitch = 0 # ロボットの仰角
+        self.max_pitch_noise = 10*np.pi/180 # pitchノイズの最大値（ラジアン）
         self.prior_pos = self.robot_pos
+        self.action_range = 0.1 # 進行方向の制限 0.1なら+-18度に制限される
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -371,7 +372,7 @@ class MySimulator2:
         シミュレーションを1ステップ進める関数
         """
         self.prior_pos = self.robot_pos
-        self.action = action*0.1 # actionを更新 0.1を掛けると進行方向が制限される。
+        self.action = action*self.action_range # actionを更新
         self.action_average = self.action_average + action*(1-self.action_discount) # action_averageを更新
         if self.action_average > 1:
             self.action_average -= 2
