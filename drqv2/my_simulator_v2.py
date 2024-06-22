@@ -22,7 +22,7 @@ class MyEnv2(gym.Env):
         super(MyEnv2, self).__init__()
         self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         self.obs_size = 64 # 観測画像のサイズ
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 2), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 3), dtype=np.float32)
         self.reward_range = (-1, 1) # rewardの範囲
         self.simulator = None # シミュレータのインスタンスを保持する変数
         self.episode_length = 300 # エピソードの最大ステップ数
@@ -48,7 +48,7 @@ class MyEnv2(gym.Env):
         return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action}
     
     def observation_spec(self):
-        return specs.Array(shape=(2, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
+        return specs.Array(shape=(3, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
 
     def action_spec(self):
         return specs.BoundedArray(shape=(1,), dtype=np.float32, name='action', minimum=-1, maximum=1)
@@ -245,19 +245,13 @@ class MySimulator2:
         init_pos_list = []
         for area in self.areas:
             if area.is_line:
-                # print('start: {}, end: {}'.format(area.start_pos, area.end_pos))
                 init_pos_list.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
-        # self.robot_pos = np.array(init_pos) # ロボットの初期位置
         self.robot_pos = np.array(init_pos_list[np.random.randint(len(init_pos_list))], dtype=int)
         self.obs = None # 観測画像を保持する変数
-        self.robot_yaw = 0 # ロボットの回転角度
-        self.robot_pitch = 0 # ロボットの仰角
         self.prior_pos = self.robot_pos
-        self.use_mark_action_obs = False # アクションをマークとして与えるか。Falseならグレー画像として与える。
-        self.use_average_reward = True # 平均のactionを報酬として用いる
-        self.use_action_diff_reward = True # 前回のactionとの誤差を報酬として用いる
-        
         self.prior_action = 0
+        self.use_action_diff_reward = True # 進行方向との差ではなく，前回actioとの差を報酬として用いる。
+        self.action_limit = 0.2 # 進行方向を制限する 0.1なら+-18度
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -355,9 +349,11 @@ class MySimulator2:
         ３つ合わせて-1から1の範囲に収まるように調整すること。
         """
         reward = 0
-        # 1. actionの絶対値に基づく報酬
-        b = 2
-        reward += (0.5 - np.abs(self.action)**b) # -0.5~0.5の範囲
+        if self.use_action_diff_reward:
+            reward += 0.5 - (self.prior_action - self.action)**2 / 4
+        else:
+            b = 2
+            reward += (0.5 - np.abs(self.action)**b) # -0.5~0.5の範囲
         # 2. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
         if np.sum(self.obs[:,:,0] == 0) == 0:
             print('no black pixel')
@@ -368,8 +364,7 @@ class MySimulator2:
             image_center = np.array([self.obs_size[0]//2, self.obs_size[1]//2]) # 画像の中心座標
             # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
             reward += (0.5 - np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center)) # -1~1の範囲
-        # 3. actionの誤差に基づく報酬
-        reward -= (self.prior_action - self.action)**2
+        
         # rewardを-1から1の範囲に収める
         reward = np.clip(reward, -1, 1)
         return reward
@@ -379,41 +374,34 @@ class MySimulator2:
         シミュレーションを1ステップ進める関数
         """
         self.prior_pos = self.robot_pos
-        self.action = action*0.1 # actionを更新 0.1を掛けると進行方向が制限される。
-        self.action_average = self.action_average + action*(1-self.action_discount) # action_averageを更新
+        self.action = action # actionを更新 0.1を掛けると進行方向が制限される。
+        self.action_average = self.action_average + action*(1-self.action_discount)*self.action_limit # action_averageを更新
         if self.action_average > 1:
             self.action_average -= 2
         elif self.action_average < -1:
             self.action_average += 2
+
         # ロボットの位置を更新
-        theta = self.robot_yaw + (self.action_average + self.action)*np.pi
-        print(f"theta:{theta*180/np.pi}")
+        theta = (self.action_average + self.action*self.action_limit)*np.pi
+        # print(f"theta:{theta*180/np.pi}")
         new_pos = self.robot_pos + (self.max_length * np.array([np.cos(theta), np.sin(theta)])).astype(int)
         self.is_in_area = True # 画像の範囲内にいるかどうかを示すフラグ
         if 0 <= new_pos[0] < self.image_size[0] and 0 <= new_pos[1] < self.image_size[1]:
             self.robot_pos = new_pos # new_posが画像の範囲内ならロボットの位置を更新
         else: # 画像の範囲外に出た場合はロボットの位置を更新しない
             self.is_in_area = False # 画像の範囲外に出たことを示すフラグを立てる
+
         # 観測を更新
-        # self.obs_mapからrobot_posを中心としてrobot_yaw回転した，obs_sizeの範囲を切り取る
         obs = self.obs_map[int(self.robot_pos[1]-self.obs_size[1]//2):int(self.robot_pos[1]+self.obs_size[1]//2), int(self.robot_pos[0]-self.obs_size[0]//2):int(self.robot_pos[0]+self.obs_size[0]//2)]
-        
-        # 観測を取得
         if obs.shape != (self.obs_size[1], self.obs_size[0]):
             # obsのサイズが合わない（=マップからはみ出している）場合は白で埋める
             obs = np.ones(self.obs_size)
-        # yaw方向のノイズを追加
-        
-        # pitch方向のノイズを追加
-        
+
         # 進行方向を示す観測を追加
-        obs = None
-        obs = np.dstack([obs, np.zeros_like(obs)])
-        if self.use_mark_action_obs:
-            # 実装する
-            pass
-        else:
-            obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
+        obs = np.dstack([obs, np.zeros_like(obs), np.zeros_like(obs)])
+        obs[:,:,1] = (self.action_average + 1)/2 # action_averageに合わせてグレーに塗りつぶす
+        # 前回actionを示す観測を追加
+        obs[:,:,2] = (self.prior_action + 1)/2
         self.obs = obs
 
         # rewardを計算
@@ -448,11 +436,15 @@ class MySimulator2:
             if i == 1:
                 obs = (obs + 1)/2 # 0~1にする
                 obs = np.dstack([obs, obs, obs])
+            # y軸を反転
+            obs = cv2.flip(obs, 0)
             image[:128, self.image_size[1]-128*(i+1):self.image_size[1]-128*i] = obs*255
         # rewardを表示
         cv2.putText(image, 'reward: {:.2f}'.format(self.reward), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 座標を表示
         cv2.putText(image, 'x: {}, y: {}'.format(self.robot_pos[0], self.robot_pos[1]), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+        # actionを表示
+        cv2.putText(image, 'action: {:.2f}'.format(self.action), (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 衝突していたら文字を表示
         if not self.is_in_area:
             cv2.putText(image, 'out of area', (300, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)

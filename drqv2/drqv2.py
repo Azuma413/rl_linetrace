@@ -44,27 +44,28 @@ class RandomShiftsAug(nn.Module):
                              padding_mode='zeros',
                              align_corners=False)
 
-
 class Encoder(nn.Module):
     def __init__(self, obs_shape):
         super().__init__()
-
-        assert len(obs_shape) == 3
-        # self.repr_dim = 32 * 35 * 35
-        self.repr_dim = 20000
-
-        self.convnet = nn.Sequential(nn.Conv2d(obs_shape[0], 32, 3, stride=2),
+        convnet_output_dim = 32 * 25 * 25
+        self.repr_dim = 10000 # actorに渡す値
+        self.convnet = nn.Sequential(nn.Conv2d(1, 32, 3, stride=2),
                                      nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.GELU())
-
+        self.mlp = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU())
         self.apply(utils.weight_init)
 
     def forward(self, obs):
         obs = obs - 0.5
-        h = self.convnet(obs)
-        h = h.view(h.shape[0], -1)
+        image = obs[:,0,:,:].unsqueeze(1)
+        obs1 = obs[:,1,0,0].unsqueeze(1)
+        obs2 = obs[:,2,0,0].unsqueeze(1)
+        h = self.convnet(image)
+        h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
+        h = torch.cat([h, obs1, obs2], dim=-1)
+        h = self.mlp(h)
         return h
 
 
