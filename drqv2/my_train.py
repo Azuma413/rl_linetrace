@@ -201,8 +201,7 @@ class Workspace:
         with snapshot.open('wb') as f:
             torch.save(payload, f)
 
-    def load_snapshot(self):
-        snapshot = self.work_dir / 'snapshot.pt'
+    def load_snapshot(self, snapshot):
         with snapshot.open('rb') as f:
             payload = torch.load(f)
         for k, v in payload.items():
@@ -214,10 +213,13 @@ def main(cfg):
     from my_train import Workspace as W
     root_dir = Path.cwd()
     workspace = W(cfg)
-    snapshot = root_dir / 'snapshot.pt'
+    snapshot = Path('hogehoge') #Path('/home/desktop/Document/VScode/rl_linetrace/drqv2/exp_local/2024.06.23/163843_/snapshot.pt')
+    print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
-        workspace.load_snapshot()
+        workspace.load_snapshot(snapshot)
+    else:
+        print('snapshot dir does not exist')
     workspace.train()
 
 

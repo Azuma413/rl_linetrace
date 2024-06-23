@@ -239,7 +239,7 @@ class MySimulator2:
         self.reward = 0
         self.is_in_area = False
         # actionの更新割引率
-        self.action_discount = 0.95# 例えば0.9ならactionに0.1をかけてaction_averageを更新
+        self.action_discount = 0.2 # 例えば0.9ならactionに0.1をかけてaction_averageを更新
         self.action_average = 0 # ロボットのx軸方向を0度とした時の，進行方向の重み付け平均
         self.action = 0 # self.action_averageの方向を0度とした時の進行方向の角度
         init_pos_list = []
@@ -251,7 +251,8 @@ class MySimulator2:
         self.prior_pos = self.robot_pos
         self.prior_action = 0
         self.use_action_diff_reward = True # 進行方向との差ではなく，前回actioとの差を報酬として用いる。
-        self.action_limit = 0.2 # 進行方向を制限する 0.1なら+-18度
+        self.action_limit = 0.25 # 進行方向を制限する 0.1なら+-18度。0.5以下に設定すること。
+        # この値を0.1で学習させた後で，0.2で追加学習というのも効果的かもしれない。
         
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
@@ -350,13 +351,14 @@ class MySimulator2:
         """
         reward = 0
         if self.use_action_diff_reward:
-            reward += 0.5 - (self.prior_action - self.action)**2 / 4
+            diff = np.abs(self.prior_action - self.action)
+            reward += 0.5 - diff/2
         else:
             b = 2
             reward += (0.5 - np.abs(self.action)**b) # -0.5~0.5の範囲
         # 2. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
         if np.sum(self.obs[:,:,0] == 0) == 0:
-            print('no black pixel')
+            # print('no black pixel')
             return -1
         else:
             black_pixels = np.where(self.obs[:,:,0] == 0) # 黒ピクセルの座標を取得
@@ -373,9 +375,10 @@ class MySimulator2:
         """
         シミュレーションを1ステップ進める関数
         """
+        self.prior_action = self.action
         self.prior_pos = self.robot_pos
         self.action = action # actionを更新 0.1を掛けると進行方向が制限される。
-        self.action_average = self.action_average + action*(1-self.action_discount)*self.action_limit # action_averageを更新
+        self.action_average = self.action_average + action*self.action_discount*self.action_limit # action_averageを更新
         if self.action_average > 1:
             self.action_average -= 2
         elif self.action_average < -1:
@@ -410,7 +413,6 @@ class MySimulator2:
             self.reward = self.calc_reward()
         else:
             self.reward = -1
-        self.prior_action = self.action
         return obs, self.reward
     
     def render(self):
@@ -427,24 +429,20 @@ class MySimulator2:
         cv2.arrowedLine(image, tuple(self.prior_pos), tuple(self.robot_pos), (255, 0, 0), 2)
         # 上下反転
         image = cv2.flip(image, 0)
-        # 画像の右上に1chずつobsを表示
-        for i in range(2):
-            obs = self.obs[:,:,i]
-            obs = cv2.resize(obs, (128, 128), interpolation=cv2.INTER_NEAREST)
-            if i == 0:
-                obs = np.dstack([np.zeros_like(obs), obs, obs])
-            if i == 1:
-                obs = (obs + 1)/2 # 0~1にする
-                obs = np.dstack([obs, obs, obs])
-            # y軸を反転
-            obs = cv2.flip(obs, 0)
-            image[:128, self.image_size[1]-128*(i+1):self.image_size[1]-128*i] = obs*255
+        obs = self.obs[:,:,0]
+        obs = cv2.resize(obs, (128, 128), interpolation=cv2.INTER_NEAREST)
+        obs = np.dstack([np.zeros_like(obs), obs, obs])
+        # y軸を反転
+        obs = cv2.flip(obs, 0)
+        image[:128, self.image_size[1]-128:self.image_size[1]] = obs*255
         # rewardを表示
         cv2.putText(image, 'reward: {:.2f}'.format(self.reward), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 座標を表示
         cv2.putText(image, 'x: {}, y: {}'.format(self.robot_pos[0], self.robot_pos[1]), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # actionを表示
         cv2.putText(image, 'action: {:.2f}'.format(self.action), (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(image, 'prior action: {:.2f}'.format(self.prior_action), (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(image, 'motion direction: {:.2f}'.format(self.action_average), (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2, cv2.LINE_AA)
         # 衝突していたら文字を表示
         if not self.is_in_area:
             cv2.putText(image, 'out of area', (300, 280), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)

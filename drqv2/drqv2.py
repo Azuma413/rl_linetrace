@@ -50,11 +50,11 @@ class Encoder(nn.Module):
         convnet_output_dim = 32 * 25 * 25
         self.repr_dim = 10000 # actorに渡す値
         self.convnet = nn.Sequential(nn.Conv2d(1, 32, 3, stride=2),
-                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.GELU(), nn.Conv2d(32, 32, 3, stride=1),
-                                     nn.GELU())
-        self.mlp = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU())
+                                     nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
+                                     nn.SiLU())
+        self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU())
         self.apply(utils.weight_init)
 
     def forward(self, obs):
@@ -65,7 +65,7 @@ class Encoder(nn.Module):
         h = self.convnet(image)
         h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
         h = torch.cat([h, obs1, obs2], dim=-1)
-        h = self.mlp(h)
+        h = self.fcl(h)
         return h
 
 
@@ -150,9 +150,10 @@ class DrQV2Agent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # optimizers
-        self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=lr)
-        self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=lr)
-        self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=lr)
+        # AdamWにしてみる？
+        self.encoder_opt = torch.optim.AdamW(self.encoder.parameters(), lr=lr)
+        self.actor_opt = torch.optim.AdamW(self.actor.parameters(), lr=lr)
+        self.critic_opt = torch.optim.AdamW(self.critic.parameters(), lr=lr)
 
         # data augmentation
         self.aug = RandomShiftsAug(pad=4)
