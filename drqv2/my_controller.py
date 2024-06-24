@@ -37,6 +37,7 @@ class MyController(gym.Env):
                 break
             if camera_idx > 30:
                 raise ValueError("camera not found")
+        rclpy.init(args=None)
         self.node = RosNode()
         self.duty = 0.7 # 10mm/stepとなるように調整
         self.action_discount = 0.2
@@ -52,6 +53,8 @@ class MyController(gym.Env):
     def __del__(self):
         self.cap.release()
         self.control(0, move=False)
+        self.node.destroy_node()
+        rclpy.shutdown()
         
     def reset(self):
         """
@@ -61,8 +64,9 @@ class MyController(gym.Env):
         self.control(0, move=False)
         # 初期画像を取得
         self.obs = self.make_obs()
+        obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
         print("reset controller")
-        return { 'observation': self.obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
+        return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
 
     def step(self, action):
         """
@@ -79,11 +83,11 @@ class MyController(gym.Env):
         self.theta = (self.action_average + self.action*self.action_limit)*np.pi
         self.control(self.theta) # モーターを制御
         self.obs = self.make_obs() # 観測を取得
-        self.obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
+        obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
         # publish image
         self.node.pub_image(self.render())
         
-        return { 'observation': self.obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
+        return { 'observation': obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
         
     def observation_spec(self):
         return specs.Array(shape=(3, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
@@ -98,24 +102,26 @@ class MyController(gym.Env):
         """
         # 実行周期を書き込む
         now = time.time()
+        t = 1
         if self.time is not None:
             t = now - self.time
         self.time = now
         freq = 1/t
         image = None
         if self.obs is not None:
-            image = self.obs.copy()
+            image = self.obs.copy()*255
             image[:,:,1] = image[:,:,0]
             image[:,:,2] = image[:,:,0]
             # 4倍に拡大
             image = cv2.resize(image, (256, 256))
+            image = image.astype(np.uint8)
         else:
             image = np.zeros((256, 256, 3), dtype=np.uint8)
         h, w = image.shape[:2]
         # theta方向に矢印を描画
-        image = cv2.arrowedLine(image, (w//2, h//2), (w//2+int(np.cos(self.theta)*h//4), h//2+int(np.sin(self.theta)*h//4)), (0, 0, 255), 5)
+        image = cv2.arrowedLine(image, (w//2, h//2), (w//2+int(np.cos(self.theta)*h//4), h//2+int(np.sin(self.theta)*h//4)), (255, 0, 0), 5)
         # 周波数を描画
-        image = cv2.putText(image, f"{freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        image = cv2.putText(image, f"{freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         return image
 
     def control(self, theta, move=True):
@@ -198,8 +204,9 @@ class MyController(gym.Env):
 class RosNode(Node):
     def __init__(self):
         super().__init__('my_controller_node')
-        self.img_pub = self.create_publisher(Image, 'image', 10)
+        self.img_pub = self.create_publisher(Image, 'image_data', 10)
         self.bridge = CvBridge()
+
     def pub_image(self, np_img):
-        img_msg = self.bridge.cv2_to_imgmsg(np_img)
+        img_msg = self.bridge.cv2_to_imgmsg(np_img, "rgb8")
         self.img_pub.publish(img_msg)
