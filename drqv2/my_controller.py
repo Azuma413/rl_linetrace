@@ -5,9 +5,13 @@ import gym
 from gym import spaces
 import numpy as np
 from dm_env import specs
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+import time
 
 # 定数の宣言
-LINE_THREASHOLD = 50 # 画像の2値化の閾値 0-255の範囲で指定
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 
 class MyController(gym.Env):
@@ -15,7 +19,7 @@ class MyController(gym.Env):
         super(MyController, self).__init__()
         self.action_space = spaces.Box(low=-1, high=1, shape=(1,), dtype=np.float32)
         self.obs_size = 64 # 観測画像のサイズ
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 1), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(self.obs_size, self.obs_size, 3), dtype=np.float32)
         self.reward_range = (-1, 1) # rewardの範囲
         self.simulator = None # シミュレータのインスタンスを保持する変数
         self.ain1 = DigitalOutputDevice(24) # モーター1の制御ピン1
@@ -33,67 +37,101 @@ class MyController(gym.Env):
                 break
             if camera_idx > 30:
                 raise ValueError("camera not found")
-        self.action = np.array([0.0, 0.0])
-        self.image = None
-        self.action_discount = 0.95
-        self.action_average = np.ones(2)
-        
+        self.node = RosNode()
+        self.duty = 0.7 # 10mm/stepとなるように調整
+        self.action_discount = 0.2
+        self.action_average = 0
+        self.action = 0
+        self.obs = None
+        self.prior_action = 0
+        self.action_limit = 0.25
+        self.time = None
+        self.theta = 0
+
     # デコンストラクタ
     def __del__(self):
         self.cap.release()
-        self.control([0, 0])
+        self.control(0, move=False)
         
     def reset(self):
         """
         環境のリセット関数
         """
         # モーターを停止
-        self.control([0, 0])
+        self.control(0, move=False)
         # 初期画像を取得
-        obs = self.make_obs()
+        self.obs = self.make_obs()
         print("reset controller")
-        return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
+        return { 'observation': self.obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0.0, 0.0], dtype=np.float32)}
 
     def step(self, action):
         """
         環境を1ステップ進める関数
-        action[0]: 右
-        action[1]: 前
+        action[0]: 進行方向に対する角度
         """
+        self.prior_action = self.action
         self.action = action
-        print("action: ", action)
-        self.control(action) # モーターを制御
-        obs = self.make_obs() # 観測を取得
-        reward = 0 # 学習はしないので報酬は0
-        done = False
-        return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action.astype(np.float32)}
+        self.action_average = self.action_average + action*self.action_discount*self.action_limit
+        if self.action_average > 1:
+            self.action_average -= 2
+        elif self.action_average < -1:
+            self.action_average += 2
+        self.theta = (self.action_average + self.action*self.action_limit)*np.pi
+        self.control(self.theta) # モーターを制御
+        self.obs = self.make_obs() # 観測を取得
+        self.obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
+        # publish image
+        self.node.pub_image(self.render())
+        
+        return { 'observation': self.obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
         
     def observation_spec(self):
-        return specs.Array(shape=(1, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
+        return specs.Array(shape=(3, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
 
     def action_spec(self):
-        return specs.BoundedArray(shape=(2,), dtype=np.float32, name='action', minimum=-1, maximum=1)
+        return specs.BoundedArray(shape=(1,), dtype=np.float32, name='action', minimum=-1, maximum=1)
 
     def render(self, mode='rgb_array'):
         """
         記録用の画像を返す関数
         obsも見れるようにしたい。
         """
-        frame = None
-        # action方向に矢印を描画
-        if self.action is not None:
-            frame = self.image.copy()
-            h, w = frame.shape[:2]
-            cv2.arrowedLine(frame, (w//2, h//2), (w//2+int(self.action[0]*w//4), h//2+int(self.action[1]*w//4)), (255, 0, 0), 2)
+        # 実行周期を書き込む
+        now = time.time()
+        if self.time is not None:
+            t = now - self.time
+        self.time = now
+        freq = 1/t
+        image = None
+        if self.obs is not None:
+            image = self.obs.copy()
+            image[:,:,1] = image[:,:,0]
+            image[:,:,2] = image[:,:,0]
+            # 4倍に拡大
+            image = cv2.resize(image, (256, 256))
         else:
-            frame = np.zeros((self.obs_size, self.obs_size, 3), dtype=np.uint8)
-        return frame
+            image = np.zeros((256, 256, 3), dtype=np.uint8)
+        h, w = image.shape[:2]
+        # theta方向に矢印を描画
+        image = cv2.arrowedLine(image, (w//2, h//2), (w//2+int(np.cos(self.theta)*h//4), h//2+int(np.sin(self.theta)*h//4)), (0, 0, 255), 5)
+        # 周波数を描画
+        image = cv2.putText(image, f"{freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        return image
 
-    def control(self, action):
+    def control(self, theta, move=True):
         """
         モーターを制御する関数
         """
-        speed = [(action[1] + action[0])/2, (action[1] - action[0])/2]
+        if not move:
+            self.ain1.off()
+            self.ain2.off()
+            self.bin1.off()
+            self.bin2.off()
+            self.pwma.value = 0
+            self.pwmb.value = 0
+            return
+
+        speed = [np.cos(theta)*self.duty, np.sin(theta)*self.duty]
         if CHANGE_MOTOR:
             speed = speed[::-1]
         # motor0 control
@@ -128,11 +166,10 @@ class MyController(gym.Env):
         画像を取得して観測を作成する関数
         """
         while True:
-            for _ in range(10):
+            for _ in range(10): # 最新の画像を取得するために10回読み込む
                 ret, frame = self.cap.read()
             if not ret:
                 continue
-            self.image = frame
             # frameを正方形にクリップ
             h, w = frame.shape[:2]
             if h > w:
@@ -143,18 +180,26 @@ class MyController(gym.Env):
             frame = cv2.resize(frame, (64, 64))
             # frameをモノクロに変換
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # frameの平均値を取得
+            mean = np.mean(frame) # 50程度がよさそう。改善の余地あり
+            print(f"mean: {mean}")
+            therehold = 50
             # frameを2値化
-            _, frame = cv2.threshold(frame, LINE_THREASHOLD, 255, cv2.THRESH_BINARY)
-            frame = frame.astype(np.float32) # 観測をfloat32に変換
-            # frameを正規化
-            frame /= 255
+            _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
+            frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
             print(f"白の割合：{np.sum(frame)/(64**2)}")
             
             # ここから追加
-            self.action_average = self.action_average*self.action_discount + self.action*(1-self.action_discount)
-            frame = np.dstack([frame, np.zeros_like(frame)])
-            coord = [int(self.obs_size[0]//2 + 28*self.action_average[0]), int(self.obs_size[1]//2 + 28*self.action_average[1])]
-            frame[coord[1]-4:coord[1]+4, coord[0]-4:coord[0]+4, 1] = 1
-            frame = frame.astype(np.float32)
-            frame = np.transpose(frame, (2, 0, 1))
+            frame = np.dstack([frame, np.zeros_like(frame), np.zeros_like(frame)])
+            frame[:,:,1] = (self.action_average + 1)/2
+            frame[:,:,2] = (self.prior_action + 1)/2
             return frame
+
+class RosNode(Node):
+    def __init__(self):
+        super().__init__('my_controller_node')
+        self.img_pub = self.create_publisher(Image, 'image', 10)
+        self.bridge = CvBridge()
+    def pub_image(self, np_img):
+        img_msg = self.bridge.cv2_to_imgmsg(np_img)
+        self.img_pub.publish(img_msg)

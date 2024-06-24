@@ -77,10 +77,13 @@ class Workspace:
 def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
-    snapshot = Path(Path(__file__).parent, 'weight1.pt') # このファイルと同じディレクトリにsnapshot.ptがあると仮定
+    snapshot = Path(__file__).parent / 'weight3.pt' # このファイルと同じディレクトリにsnapshot.ptがあると仮定
+    print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
         workspace.load_snapshot(snapshot) # 学習済みモデルをロード
+    else:
+        print("snapshot not found")
     workspace.eval()
 
 if __name__ == '__main__':
