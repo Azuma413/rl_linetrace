@@ -129,8 +129,12 @@ fclを削除して学習させたところ非常にうまくいった。weight3�
 - weight3の評価  
 学習段階では10mm/stepで学習させたが，ある程度の速度の変動はカバーできることが確認された。
 
-| | |
-|---|---|
-|<img width="19.5%" src="/images/normal_speed.gif">| |
+|通常時|高速移動時|低速移動時|
+|---|---|---|
+|<img width="40%" src="/images/normal_speed.gif">|<img width="40%" src="/images/high_speed.gif">|<img width="40%" src="/images/low_speed.gif">|
+
+早すぎるとラインを逸脱する。
+<img width="40%" src="/images/very_high_speed.gif">
 
 また，ライン上を逸脱した場合でも高い復帰性能を持っていることが確認された。
+<img width="40%" src="/images/search_line.gif">
