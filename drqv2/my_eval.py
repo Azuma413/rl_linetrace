@@ -30,7 +30,7 @@ def make_agent(obs_spec, action_spec, cfg):
 class Workspace:
     def __init__(self, cfg):
         self.cfg = cfg
-        utils.set_seed_everywhere(cfg.seed)
+        # utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
         self.setup()
         self.agent = make_agent(self.eval_env.observation_spec(),
@@ -80,10 +80,13 @@ class Workspace:
 def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
-    snapshot = Path(Path(__file__).parent, 'wheight1.pt')
+    snapshot = Path(__file__).parent / 'weight3.pt'
+    print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
         workspace.load_snapshot(snapshot)
+    else:
+        print("snapshot does not exist")
     workspace.eval()
 
 if __name__ == '__main__':

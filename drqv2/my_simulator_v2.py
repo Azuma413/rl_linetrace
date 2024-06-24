@@ -246,6 +246,7 @@ class MySimulator2:
         for area in self.areas:
             if area.is_line:
                 init_pos_list.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
+        #self.robot_pos = np.array([self.image_size[0]//2, self.image_size[1]//2]) # マップ中央に出現。評価用
         self.robot_pos = np.array(init_pos_list[np.random.randint(len(init_pos_list))], dtype=int)
         self.obs = None # 観測画像を保持する変数
         self.prior_pos = self.robot_pos

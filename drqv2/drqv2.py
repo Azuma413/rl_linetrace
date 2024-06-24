@@ -48,13 +48,13 @@ class Encoder(nn.Module):
     def __init__(self, obs_shape):
         super().__init__()
         convnet_output_dim = 32 * 25 * 25
-        self.repr_dim = 10000 # actorに渡す値
+        self.repr_dim = convnet_output_dim + 2 # 10000 # actorに渡す値
         self.convnet = nn.Sequential(nn.Conv2d(1, 32, 3, stride=2),
                                      nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.SiLU())
-        self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU())
+        # self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU()) # こいつを使うとモデルが巨大化する？
         self.apply(utils.weight_init)
 
     def forward(self, obs):
@@ -65,7 +65,7 @@ class Encoder(nn.Module):
         h = self.convnet(image)
         h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
         h = torch.cat([h, obs1, obs2], dim=-1)
-        h = self.fcl(h)
+        # h = self.fcl(h)
         return h
 
 
