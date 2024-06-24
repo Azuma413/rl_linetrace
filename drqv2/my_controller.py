@@ -7,8 +7,8 @@ import numpy as np
 from dm_env import specs
 
 # 定数の宣言
-LINE_THREASHOLD = 100 # 画像の2値化の閾値 0-255の範囲で指定
-CHANGE_MOTOR = False # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
+LINE_THREASHOLD = 50 # 画像の2値化の閾値 0-255の範囲で指定
+CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -29,7 +29,7 @@ class MyController(gym.Env):
         while True:
             self.cap = cv2.VideoCapture(camera_idx)
             if self.cap.isOpened():
-                print("camera{camera_idx} opened")
+                print(f"camera{camera_idx} opened")
                 break
             if camera_idx > 30:
                 raise ValueError("camera not found")
@@ -93,7 +93,7 @@ class MyController(gym.Env):
         """
         モーターを制御する関数
         """
-        speed = [-(action[0] + action[1])/np.sqrt(2), (action[0] - action[1])/np.sqrt(2)]
+        speed = [(action[1] + action[0])/2, (action[1] - action[0])/2]
         if CHANGE_MOTOR:
             speed = speed[::-1]
         # motor0 control
@@ -128,7 +128,8 @@ class MyController(gym.Env):
         画像を取得して観測を作成する関数
         """
         while True:
-            ret, frame = self.cap.read()
+            for _ in range(10):
+                ret, frame = self.cap.read()
             if not ret:
                 continue
             self.image = frame
@@ -147,7 +148,7 @@ class MyController(gym.Env):
             frame = frame.astype(np.float32) # 観測をfloat32に変換
             # frameを正規化
             frame /= 255
-            frame = 1 - frame # 白黒反転
+            print(f"白の割合：{np.sum(frame)/(64**2)}")
             
             # ここから追加
             self.action_average = self.action_average*self.action_discount + self.action*(1-self.action_discount)
