@@ -143,7 +143,7 @@ class MyController(gym.Env):
             self.duty = 1
         elif self.duty < 0:
             self.duty = 0
-        speed = [np.cos(theta)*self.duty, np.sin(theta)*self.duty]
+        speed = [np.cos(theta + np.pi*3/4)*self.duty, np.sin(theta + np.pi*3/4)*self.duty]
         if CHANGE_MOTOR:
             speed = speed[::-1]
         # motor0 control
