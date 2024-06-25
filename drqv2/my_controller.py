@@ -111,6 +111,7 @@ class MyController(gym.Env):
             t = now - self.time
         self.time = now
         self.freq = 1/t
+        print(f"freq: {self.freq}")
         image = None
         if self.obs is not None:
             image = self.obs.copy()*255
