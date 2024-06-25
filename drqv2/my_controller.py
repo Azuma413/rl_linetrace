@@ -87,9 +87,6 @@ class MyController(gym.Env):
         self.control(self.theta) # モーターを制御
         self.obs = self.make_obs() # 観測を取得
         obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
-        image = self.render()
-        self.send_udp(image) # 画像をUDPで送信
-        # self.send_udp(image)
         
         return { 'observation': obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
         
@@ -127,6 +124,7 @@ class MyController(gym.Env):
         image = cv2.arrowedLine(image, (w//2, h//2), (w//2+int(np.cos(self.theta)*h//4), h//2+int(np.sin(self.theta)*h//4)), (255, 0, 0), 5)
         # 周波数を描画
         image = cv2.putText(image, f"{self.freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        self.send_udp(image)
         return image
 
     def control(self, theta, move=True):
