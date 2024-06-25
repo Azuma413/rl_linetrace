@@ -205,7 +205,7 @@ class MyController(gym.Env):
                 frame = np.ones_like(frame)
             else:
                 # 平均値に応じて2値化の閾値を変更
-                therehold = mean
+                therehold = mean*0.8
                 # frameを2値化
                 _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
                 frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
