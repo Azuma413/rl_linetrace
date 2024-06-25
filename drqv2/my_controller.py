@@ -28,9 +28,8 @@ class MyController(gym.Env):
         self.bin1 = DigitalOutputDevice(25) # モーター2の制御ピン1
         self.bin2 = DigitalOutputDevice(1) # モーター2の制御ピン2
         self.pwmb = PWMOutputDevice(13) # モーター2のPWM制御ピン
-        # キャプチャに成功するまで繰り返す
         camera_idx = 0
-        while True:
+        while True: # キャプチャに成功するまで繰り返す
             self.cap = cv2.VideoCapture(camera_idx)
             if self.cap.isOpened():
                 print(f"camera{camera_idx} opened")
@@ -139,8 +138,7 @@ class MyController(gym.Env):
             self.pwma.value = 0
             self.pwmb.value = 0
             return
-        self.duty = NOMINAL_SPEED*self.freq/MAX_SPEED
-        print(f"duty: {self.duty} = {NOMINAL_SPEED}*{self.freq}/{MAX_SPEED}")
+        self.duty = NOMINAL_SPEED*self.freq/MAX_SPEED # 周波数に応じてdutyを変更
         if self.duty > 1:
             self.duty = 1
         elif self.duty < 0:
@@ -190,28 +188,18 @@ class MyController(gym.Env):
                 frame = frame[(h-w)//2:(h+w)//2, :]
             else:
                 frame = frame[:, (w-h)//2:(w+h)//2]
-            # frameを64x64にリサイズ
-            frame = cv2.resize(frame, (64, 64))
-            # frameをモノクロに変換
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # frameの平均値を取得
-            mean = np.mean(frame) # 50程度がよさそう。改善の余地あり
+            frame = cv2.resize(frame, (64, 64)) # frameを64x64にリサイズ
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # frameをモノクロに変換
+            mean = np.mean(frame) # frameの平均値を取得
             print(f"mean: {mean}")
-            # frameの分散を取得
-            var = np.var(frame)
+            var = np.var(frame) # frameの分散を取得
             print(f"var: {var}")
-            # 分散が小さい場合は線を検出していないと判断。観測を白で埋める
-            if var < 0.01:
+            if var < 0.01: # 分散が小さい場合は線を検出していないと判断。観測を白で埋める
                 frame = np.ones_like(frame)
             else:
-                # 平均値に応じて2値化の閾値を変更
-                therehold = mean*0.8
-                # frameを2値化
-                _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
+                therehold = mean*0.5 # 平均値に応じて2値化の閾値を変更
+                _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY) # frameを2値化
                 frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
-            
-            # print(f"白の割合：{np.sum(frame)/(64**2)}")
-            # ここから追加
             frame = np.dstack([frame, np.zeros_like(frame), np.zeros_like(frame)])
             frame[:,:,1] = (self.action_average + 1)/2
             frame[:,:,2] = (self.prior_action + 1)/2
