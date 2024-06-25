@@ -12,7 +12,7 @@ import time
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 MAX_UDP_PACKET_SIZE = 10000
 MAX_SPEED = 60 # 最大速度[mm/s]
-NOMINAL_SPEED = 30 # ノミナル速度[mm/step]
+NOMINAL_SPEED = 20 # ノミナル速度[mm/step]
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -46,7 +46,7 @@ class MyController(gym.Env):
         self.time = None
         self.theta = 0
         self.freq = 1.0
-        self.thresh = 0.2 # 2値化の閾値（平均値の何倍か）
+        self.thresh = 0.1 # 2値化の閾値（平均値の何倍か）
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
