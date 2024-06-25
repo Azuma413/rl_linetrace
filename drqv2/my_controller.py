@@ -141,6 +141,11 @@ class MyController(gym.Env):
             self.pwmb.value = 0
             return
         self.duty = NOMINAL_SPEED*self.freq/MAX_SPEED
+        print(f"duty: {self.duty}")
+        if self.duty > 1:
+            self.duty = 1
+        elif self.duty < 0:
+            self.duty = 0
         speed = [np.cos(theta)*self.duty, np.sin(theta)*self.duty]
         if CHANGE_MOTOR:
             speed = speed[::-1]
@@ -197,7 +202,7 @@ class MyController(gym.Env):
             var = np.var(frame)
             print(f"var: {var}")
             # 分散が小さい場合は線を検出していないと判断。観測を白で埋める
-            if var < 100:
+            if var < 0.01:
                 frame = np.ones_like(frame)
             else:
                 # 平均値に応じて2値化の閾値を変更
