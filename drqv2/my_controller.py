@@ -46,7 +46,7 @@ class MyController(gym.Env):
         self.action_limit = 0.25
         self.time = None
         self.theta = 0
-        self.freq = 1
+        self.freq = 1.0
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -141,7 +141,7 @@ class MyController(gym.Env):
             self.pwmb.value = 0
             return
         self.duty = NOMINAL_SPEED*self.freq/MAX_SPEED
-        print(f"duty: {self.duty}")
+        print(f"duty: {self.duty} = {NOMINAL_SPEED}*{self.freq}/{MAX_SPEED}")
         if self.duty > 1:
             self.duty = 1
         elif self.duty < 0:
@@ -211,7 +211,7 @@ class MyController(gym.Env):
                 _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
                 frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
             
-            print(f"白の割合：{np.sum(frame)/(64**2)}")
+            # print(f"白の割合：{np.sum(frame)/(64**2)}")
             # ここから追加
             frame = np.dstack([frame, np.zeros_like(frame), np.zeros_like(frame)])
             frame[:,:,1] = (self.action_average + 1)/2
@@ -230,4 +230,4 @@ class MyController(gym.Env):
             is_last_chunk = (1 if i == total_chunks - 1 else 0).to_bytes(1, 'big')
             udp_packet = header + is_last_chunk + chunk
             self.udp_socket.sendto(udp_packet, self.address)
-            print(f"send udp: {len(udp_packet)}")
+            # print(f"send udp: {len(udp_packet)}")
