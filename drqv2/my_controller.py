@@ -10,8 +10,9 @@ import time
 
 # 定数の宣言
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
-
 MAX_UDP_PACKET_SIZE = 10000
+MAX_SPEED = 60 # 最大速度[mm/s]
+NOMINAL_SPEED = 10 # ノミナル速度[mm/step]
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -45,6 +46,7 @@ class MyController(gym.Env):
         self.action_limit = 0.25
         self.time = None
         self.theta = 0
+        self.freq = 1
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -108,7 +110,7 @@ class MyController(gym.Env):
         if self.time is not None:
             t = now - self.time
         self.time = now
-        freq = 1/t
+        self.freq = 1/t
         image = None
         if self.obs is not None:
             image = self.obs.copy()*255
@@ -123,7 +125,7 @@ class MyController(gym.Env):
         # theta方向に矢印を描画
         image = cv2.arrowedLine(image, (w//2, h//2), (w//2+int(np.cos(self.theta)*h//4), h//2+int(np.sin(self.theta)*h//4)), (255, 0, 0), 5)
         # 周波数を描画
-        image = cv2.putText(image, f"{freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        image = cv2.putText(image, f"{self.freq:.2f}Hz", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         return image
 
     def control(self, theta, move=True):
@@ -138,7 +140,7 @@ class MyController(gym.Env):
             self.pwma.value = 0
             self.pwmb.value = 0
             return
-
+        self.duty = NOMINAL_SPEED*self.freq/MAX_SPEED
         speed = [np.cos(theta)*self.duty, np.sin(theta)*self.duty]
         if CHANGE_MOTOR:
             speed = speed[::-1]
@@ -191,12 +193,20 @@ class MyController(gym.Env):
             # frameの平均値を取得
             mean = np.mean(frame) # 50程度がよさそう。改善の余地あり
             print(f"mean: {mean}")
-            therehold = 50
-            # frameを2値化
-            _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
-            frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
-            print(f"白の割合：{np.sum(frame)/(64**2)}")
+            # frameの分散を取得
+            var = np.var(frame)
+            print(f"var: {var}")
+            # 分散が小さい場合は線を検出していないと判断。観測を白で埋める
+            if var < 100:
+                frame = np.ones_like(frame)
+            else:
+                # 平均値に応じて2値化の閾値を変更
+                therehold = mean
+                # frameを2値化
+                _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY)
+                frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
             
+            print(f"白の割合：{np.sum(frame)/(64**2)}")
             # ここから追加
             frame = np.dstack([frame, np.zeros_like(frame), np.zeros_like(frame)])
             frame[:,:,1] = (self.action_average + 1)/2
