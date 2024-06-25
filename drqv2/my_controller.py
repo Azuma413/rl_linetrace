@@ -12,7 +12,7 @@ import time
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 MAX_UDP_PACKET_SIZE = 10000
 MAX_SPEED = 60 # 最大速度[mm/s]
-NOMINAL_SPEED = 10 # ノミナル速度[mm/step]
+NOMINAL_SPEED = 30 # ノミナル速度[mm/step]
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
