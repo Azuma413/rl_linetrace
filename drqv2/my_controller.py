@@ -11,7 +11,7 @@ import time
 # 定数の宣言
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
 
-MAX_UDP_PACKET_SIZE = 500
+MAX_UDP_PACKET_SIZE = 10000
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -47,6 +47,7 @@ class MyController(gym.Env):
         self.theta = 0
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.address = ('192.168.0.255', 12345)
         self.udp_socket.bind(self.address)
 
@@ -54,6 +55,7 @@ class MyController(gym.Env):
     def __del__(self):
         self.cap.release()
         self.control(0, move=False)
+        self.udp_socket.close()
         
     def reset(self):
         """
@@ -83,7 +85,9 @@ class MyController(gym.Env):
         self.control(self.theta) # モーターを制御
         self.obs = self.make_obs() # 観測を取得
         obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
-        self.send_udp(self.render()) # 画像をUDPで送信
+        image = self.render()
+        self.send_udp(image) # 画像をUDPで送信
+        # self.send_udp(image)
         
         return { 'observation': obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
         
@@ -204,10 +208,11 @@ class MyController(gym.Env):
         画像をUDPで送信する関数
         """
         byte = cv2.imencode('.png', image)[1].tobytes()
-        chunks = [byte[i:i+byte] for i in range(0, len(byte), MAX_UDP_PACKET_SIZE)]
+        chunks = [byte[i:i+MAX_UDP_PACKET_SIZE] for i in range(0, len(byte), MAX_UDP_PACKET_SIZE)]
         total_chunks = len(chunks)
         for i, chunk in enumerate(chunks):
             header = i.to_bytes(4, 'big') + total_chunks.to_bytes(4, 'big')
             is_last_chunk = (1 if i == total_chunks - 1 else 0).to_bytes(1, 'big')
             udp_packet = header + is_last_chunk + chunk
             self.udp_socket.sendto(udp_packet, self.address)
+            print(f"send udp: {len(udp_packet)}")

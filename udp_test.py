@@ -35,4 +35,4 @@ while True:
     img[:, :, :] = count
     count = (count + 1) % 256
     send_udp(img)
-    time.sleep(0.1)
+    time.sleep(0.02)
