@@ -46,6 +46,7 @@ class MyController(gym.Env):
         self.time = None
         self.theta = 0
         self.freq = 1.0
+        self.thresh = 0.2 # 2値化の閾値（平均値の何倍か）
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -197,8 +198,8 @@ class MyController(gym.Env):
             if var < 0.01: # 分散が小さい場合は線を検出していないと判断。観測を白で埋める
                 frame = np.ones_like(frame)
             else:
-                therehold = mean*0.5 # 平均値に応じて2値化の閾値を変更
-                _, frame = cv2.threshold(frame, therehold, 255, cv2.THRESH_BINARY) # frameを2値化
+                thereshold = mean*self.thresh # 平均値に応じて2値化の閾値を変更
+                _, frame = cv2.threshold(frame, thereshold, 255, cv2.THRESH_BINARY) # frameを2値化
                 frame = frame.astype(np.float32)/255 # 観測をfloat32に変換して正規化
             frame = np.dstack([frame, np.zeros_like(frame), np.zeros_like(frame)])
             frame[:,:,1] = (self.action_average + 1)/2
