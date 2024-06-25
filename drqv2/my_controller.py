@@ -161,12 +161,12 @@ class MyController(gym.Env):
             self.pwma.value = 0
         # motor1 control
         if speed[1] > 0:
-            self.bin1.on()
-            self.bin2.off()
-            self.pwmb.value = speed[1]
-        elif speed[1] < 0:
             self.bin1.off()
             self.bin2.on()
+            self.pwmb.value = speed[1]
+        elif speed[1] < 0:
+            self.bin1.on()
+            self.bin2.off()
             self.pwmb.value = -speed[1]
         else:
             self.bin1.off()
