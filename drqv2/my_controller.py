@@ -1,20 +1,17 @@
 from gpiozero import PWMOutputDevice, DigitalOutputDevice
-
 from time import sleep
 import cv2 # pip install opencv-python
 import gym
 from gym import spaces
 import numpy as np
 from dm_env import specs
-
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+import socket
 import time
 
 # 定数の宣言
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
+
+MAX_UDP_PACKET_SIZE = 500
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -39,8 +36,6 @@ class MyController(gym.Env):
                 break
             if camera_idx > 30:
                 raise ValueError("camera not found")
-        rclpy.init(args=None)
-        self.node = RosNode()
         self.duty = 0.7 # 10mm/stepとなるように調整
         self.action_discount = 0.2
         self.action_average = 0
@@ -50,13 +45,15 @@ class MyController(gym.Env):
         self.action_limit = 0.25
         self.time = None
         self.theta = 0
+        # udp通信の設定
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.address = ('192.168.0.255', 12345)
+        self.udp_socket.bind(self.address)
 
     # デコンストラクタ
     def __del__(self):
         self.cap.release()
         self.control(0, move=False)
-        self.node.destroy_node()
-        rclpy.shutdown()
         
     def reset(self):
         """
@@ -86,8 +83,7 @@ class MyController(gym.Env):
         self.control(self.theta) # モーターを制御
         self.obs = self.make_obs() # 観測を取得
         obs = np.transpose(self.obs, (2, 0, 1)).astype(np.float32)
-        # publish image
-        self.node.pub_image(self.render())
+        self.send_udp(self.render()) # 画像をUDPで送信
         
         return { 'observation': obs, 'reward': np.array([0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': action.astype(np.float32)}
         
@@ -202,13 +198,16 @@ class MyController(gym.Env):
             frame[:,:,1] = (self.action_average + 1)/2
             frame[:,:,2] = (self.prior_action + 1)/2
             return frame
-
-class RosNode(Node):
-    def __init__(self):
-        super().__init__('my_controller_node')
-        self.img_pub = self.create_publisher(Image, 'image_data', 10)
-        self.bridge = CvBridge()
-
-    def pub_image(self, np_img):
-        img_msg = self.bridge.cv2_to_imgmsg(np_img, "rgb8")
-        self.img_pub.publish(img_msg)
+        
+    def send_udp(self, image):
+        """
+        画像をUDPで送信する関数
+        """
+        byte = cv2.imencode('.png', image)[1].tobytes()
+        chunks = [byte[i:i+byte] for i in range(0, len(byte), MAX_UDP_PACKET_SIZE)]
+        total_chunks = len(chunks)
+        for i, chunk in enumerate(chunks):
+            header = i.to_bytes(4, 'big') + total_chunks.to_bytes(4, 'big')
+            is_last_chunk = (1 if i == total_chunks - 1 else 0).to_bytes(1, 'big')
+            udp_packet = header + is_last_chunk + chunk
+            self.udp_socket.sendto(udp_packet, self.address)
