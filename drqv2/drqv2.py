@@ -68,6 +68,30 @@ class Encoder(nn.Module):
         # h = self.fcl(h)
         return h
 
+class EncoderV2(nn.Module):
+    def __init__(self, obs_shape):
+        super().__init__()
+        feature_dim = 16
+        convnet_output_dim = feature_dim * 10 * 10
+        self.repr_dim = convnet_output_dim + 2 # 10000 # actorに渡す値
+        self.convnet = nn.Sequential(nn.Conv2d(1, feature_dim, 6, stride=2), # [(64 - 6)/2]+1 = 30
+                                     nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 4, stride=2), # [(30 - 4)/2]+1 = 14
+                                     nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 4, stride=1), # [(14 - 4)/1]+1 = 11
+                                     nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 2, stride=1), # [(11 - 2)/1]+1 = 10
+                                     nn.SiLU())
+        # self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU()) # こいつを使うとモデルが巨大化する？
+        self.apply(utils.weight_init)
+
+    def forward(self, obs):
+        obs = obs - 0.5
+        image = obs[:,0,:,:].unsqueeze(1)
+        obs1 = obs[:,1,0,0].unsqueeze(1)
+        obs2 = obs[:,2,0,0].unsqueeze(1)
+        h = self.convnet(image)
+        h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
+        h = torch.cat([h, obs1, obs2], dim=-1)
+        # h = self.fcl(h)
+        return h
 
 class Actor(nn.Module):
     def __init__(self, repr_dim, action_shape, feature_dim, hidden_dim):
@@ -139,7 +163,8 @@ class DrQV2Agent:
         self.stddev_clip = stddev_clip
 
         # models
-        self.encoder = Encoder(obs_shape).to(device)
+        # self.encoder = Encoder(obs_shape).to(device)
+        self.encoder = EncoderV2(obs_shape).to(device)
         self.actor = Actor(self.encoder.repr_dim, action_shape, feature_dim,
                            hidden_dim).to(device)
 

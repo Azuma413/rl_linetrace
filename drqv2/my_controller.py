@@ -46,7 +46,7 @@ class MyController(gym.Env):
         self.time = None
         self.theta = 0
         self.freq = 1.0
-        self.thresh = 0.1 # 2値化の閾値（平均値の何倍か）
+        self.thresh = 0.5 # 2値化の閾値（平均値の何倍か）
         # udp通信の設定
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
