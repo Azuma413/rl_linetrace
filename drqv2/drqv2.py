@@ -163,8 +163,8 @@ class DrQV2Agent:
         self.stddev_clip = stddev_clip
 
         # models
-        # self.encoder = Encoder(obs_shape).to(device)
-        self.encoder = EncoderV2(obs_shape).to(device)
+        self.encoder = Encoder(obs_shape).to(device)
+        # self.encoder = EncoderV2(obs_shape).to(device)
         self.actor = Actor(self.encoder.repr_dim, action_shape, feature_dim,
                            hidden_dim).to(device)
 
