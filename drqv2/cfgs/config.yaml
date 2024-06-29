@@ -29,7 +29,7 @@ use_tb: true
 experiment: exp
 # agent
 lr: 1e-4
-feature_dim: 50
+feature_dim: 20 #50
 
 agent:
   _target_: drqv2.DrQV2Agent
@@ -41,7 +41,7 @@ agent:
   update_every_steps: 2
   use_tb: ${use_tb}
   num_expl_steps: 2000
-  hidden_dim: 1024
+  hidden_dim: 256 #1024
   feature_dim: ${feature_dim}
   stddev_schedule: ${stddev_schedule}
   stddev_clip: 0.3
@@ -54,9 +54,9 @@ hydra:
     subdir: ${hydra.job.num}
   launcher:
     timeout_min: 4300
-    cpus_per_task: 10
+    cpus_per_task: 20
     gpus_per_node: 1
     tasks_per_node: 1
-    mem_gb: 160
+    mem_gb: 128
     nodes: 1
     submitit_folder: ./exp/${now:%Y.%m.%d}/${now:%H%M%S}_${agent_cfg.experiment}/.slurm

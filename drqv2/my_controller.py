@@ -10,9 +10,9 @@ import time
 
 # 定数の宣言
 CHANGE_MOTOR = True # モータの順番を入れ替えるか。Trueの場合、モータ0とモータ1の制御が入れ替わる
-MAX_UDP_PACKET_SIZE = 10000
+MAX_UDP_PACKET_SIZE = 5000
 MAX_SPEED = 60 # 最大速度[mm/s]
-NOMINAL_SPEED = 20 # ノミナル速度[mm/step]
+NOMINAL_SPEED = 30 # ノミナル速度[mm/step]
 
 class MyController(gym.Env):
     def __init__(self, env_config=None):
@@ -37,12 +37,12 @@ class MyController(gym.Env):
             if camera_idx > 30:
                 raise ValueError("camera not found")
         self.duty = 0.7 # 10mm/stepとなるように調整
-        self.action_discount = 0.2
+        self.action_discount = 0.6
         self.action_average = 0
         self.action = 0
         self.obs = None
         self.prior_action = 0
-        self.action_limit = 0.25
+        self.action_limit = 0.2
         self.time = None
         self.theta = 0
         self.freq = 1.0

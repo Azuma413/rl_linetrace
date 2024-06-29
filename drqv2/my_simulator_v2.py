@@ -239,7 +239,7 @@ class MySimulator2:
         self.reward = 0
         self.is_in_area = False
         # actionの更新割引率
-        self.action_discount = 0.6 # 0.2 # 例えば0.9ならactionに0.1をかけてaction_averageを更新
+        self.action_discount = 0.6 # 0.2
         self.action_average = 0 # ロボットのx軸方向を0度とした時の，進行方向の重み付け平均
         self.action = 0 # self.action_averageの方向を0度とした時の進行方向の角度
         init_pos_list = []
@@ -252,7 +252,7 @@ class MySimulator2:
         self.prior_pos = self.robot_pos
         self.prior_action = 0
         self.use_action_diff_reward = True # 進行方向との差ではなく，前回actioとの差を報酬として用いる。
-        self.action_limit = 0.15 #0.25 # 進行方向を制限する 0.1なら+-18度。0.5以下に設定すること。
+        self.action_limit = 0.2 #0.25 # 進行方向を制限する 0.1なら+-18度。0.5以下に設定すること。
         # この値を0.1で学習させた後で，0.2で追加学習というのも効果的かもしれない。
         
     def check_edge(self, area_idx, edge):

@@ -213,7 +213,7 @@ def main(cfg):
     from my_train import Workspace as W
     root_dir = Path.cwd()
     workspace = W(cfg)
-    snapshot = Path('hogehoge') #Path('/home/desktop/Document/VScode/rl_linetrace/drqv2/exp_local/2024.06.23/163843_/snapshot.pt')
+    snapshot = Path('hogehoge')
     print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
