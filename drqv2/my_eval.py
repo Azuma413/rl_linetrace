@@ -76,12 +76,12 @@ class Workspace:
             self.__dict__[k] = v
 
 
-@hydra.main(config_path='cfgs', config_name='config')
+@hydra.main(config_path='cfgs', config_name='config', version_base='1.1')
 def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
-    # snapshot = Path(__file__).parent / 'weight3.pt'
-    snapshot = Path("/home/desktop/Document/VScode/rl_linetrace/drqv2/exp_local/2024.06.29/064233_/snapshot.pt")
+    snapshot = Path(__file__).parent / 'weight4.pt'
+    # snapshot = Path("/home/desktop/Document/VScode/rl_linetrace/drqv2/exp_local/2024.06.29/064233_/snapshot.pt")
     print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')
