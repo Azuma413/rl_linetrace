@@ -1,28 +1,20 @@
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
 import os
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ['MUJOCO_GL'] = 'egl'
-
 from pathlib import Path
-
 import hydra
 import torch
-
-# import dmc
 import utils
 from video import VideoRecorder
 from my_controller import MyController # 実機制御用のGym環境をインポート
-
 torch.backends.cudnn.benchmark = True
 
 def make_agent(obs_spec, action_spec, cfg):
     cfg.obs_shape = obs_spec.shape
     cfg.action_shape = action_spec.shape
     return hydra.utils.instantiate(cfg)
-
-# 動画出力がうまく行っていないようなので確認すること
 
 class Workspace:
     def __init__(self, cfg):

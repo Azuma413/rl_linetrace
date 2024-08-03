@@ -1,28 +1,19 @@
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
 import os
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ['MUJOCO_GL'] = 'egl'
-
 from pathlib import Path
-
 import hydra
 import numpy as np
 import torch
 from dm_env import specs
-
-# import dmc
 import utils
 from logger import Logger
 from replay_buffer import ReplayBufferStorage, make_replay_loader
 from video import TrainVideoRecorder, VideoRecorder
-
-#from my_simulator import MyEnv
 from my_simulator_v2 import MyEnv2
-
 torch.backends.cudnn.benchmark = True
-
 
 def make_agent(obs_spec, action_spec, cfg):
     cfg.obs_shape = obs_spec.shape
@@ -50,15 +41,8 @@ class Workspace:
         # create logger
         self.logger = Logger(self.work_dir, use_tb=self.cfg.use_tb)
         # create envs
-        # self.train_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
-        #                             self.cfg.action_repeat, self.cfg.seed)
-        # self.eval_env = dmc.make(self.cfg.task_name, self.cfg.frame_stack,
-        #                             self.cfg.action_repeat, self.cfg.seed)
-        
-        # 設定を上書き
         self.train_env = MyEnv2()
         self.eval_env = MyEnv2()
-        
         # create replay buffer
         data_specs = (self.train_env.observation_spec(),
                       self.train_env.action_spec(),
@@ -110,7 +94,6 @@ class Workspace:
                     action = self.agent.act(time_step["observation"],
                                             self.global_step,
                                             eval_mode=True)
-                    # print("action: ", action)
                 time_step = self.eval_env.step(action)
                 self.video_recorder.record(self.eval_env)
                 total_reward += time_step["reward"]
@@ -221,7 +204,6 @@ def main(cfg):
     else:
         print('snapshot dir does not exist')
     workspace.train()
-
 
 if __name__ == '__main__':
     print("execute my_train.py")

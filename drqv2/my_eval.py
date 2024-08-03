@@ -1,25 +1,14 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
 import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
 import os
 os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
 os.environ['MUJOCO_GL'] = 'egl'
-
 from pathlib import Path
-
 import hydra
 import torch
-
-# import dmc
 import utils
 from video import VideoRecorder
-# from my_simulator import MyEnv
 from my_simulator_v2 import MyEnv2
-
 torch.backends.cudnn.benchmark = True
 
 def make_agent(obs_spec, action_spec, cfg):
@@ -81,7 +70,6 @@ def main(cfg):
     cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     workspace = Workspace(cfg)
     snapshot = Path(__file__).parent / 'weight4.pt'
-    # snapshot = Path("/home/desktop/Document/VScode/rl_linetrace/drqv2/exp_local/2024.06.29/064233_/snapshot.pt")
     print(snapshot)
     if snapshot.exists():
         print(f'resuming: {snapshot}')

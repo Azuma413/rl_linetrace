@@ -1,13 +1,3 @@
-# px:mm = 1:1
-# ロボットの位置やカーブの中心はmmで管理する。
-# 画像の大きさは560*720とする。
-# 観測として与える画像はロボットを中心とする64*64の画像とする。
-# 円弧は以下のように描画する
-# cv2.ellipse(img, center, axes, angle, startAngle, endAngle, color, thickness=1, lineType=cv2.LINE_8, shift=0)
-# center: 中心座標, axes: 長軸と短軸の長さ, angle: 回転角度(基本的には0), startAngle: 描画する円弧の開始角度, endAngle: 描画する円弧の終了角度 右を0度として反時計回り
-# 先は20mm+
-# カメラの高さは60mm
-# カメラの視野角は90度
 import gym
 from gym import spaces
 import numpy as np
@@ -27,7 +17,7 @@ class MyEnv2(gym.Env):
         self.simulator = None # シミュレータのインスタンスを保持する変数
         self.episode_length = 300 # エピソードの最大ステップ数
         self.count = 0 # 現在のステップ数
-        
+
     def reset(self):
         self.simulator = MySimulator2(obs_size=[self.obs_size, self.obs_size]) # 初期座標を変更する場合 
         obs, _ = self.simulator.simulate(0) # 初期観測を取得
@@ -35,27 +25,26 @@ class MyEnv2(gym.Env):
         obs = obs.astype(np.float32) # 観測をfloat32に変換
         obs = np.transpose(obs, (2, 0, 1)) # [64,64,2]->[2,64,64]
         return { 'observation': obs, 'reward': np.array([0.0], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': False , 'action': np.array([0]).astype(np.float32)}
-    
+
     def step(self, action):
         done = False
         self.count += 1 # ステップ数をカウント
         obs, reward = self.simulator.simulate(action[0]) # シミュレータを1ステップ進める
         obs = obs.astype(np.float32) # 観測をfloat32に変換
-        # [64,64,2]->[2,64,64]
         obs = np.transpose(obs, (2, 0, 1))
         if self.count >= self.episode_length: # 最大ステップ数に達したらdoneをTrueにする
             done = True
         return { 'observation': obs, 'reward': np.array([reward], dtype=np.float32), 'discount': np.array([1.0], dtype=np.float32), 'done': done , 'action': action}
-    
+
     def observation_spec(self):
         return specs.Array(shape=(3, self.obs_size, self.obs_size), dtype=np.float32, name='observation')
 
     def action_spec(self):
         return specs.BoundedArray(shape=(1,), dtype=np.float32, name='action', minimum=-1, maximum=1)
-    
+
     def render(self, mode='rgb_array'):
         return self.simulator.render() # シミュレータのrender関数を呼び出す
-    
+
 class AreaInfo:
     def __init__(self, area_idx, start_edge, end_edge, start_pos, end_pos, image_size = [1000,1000]):
         self.area_idx = area_idx
@@ -82,7 +71,7 @@ class AreaInfo:
             self.end_pos[0] += image_size[0]/20*(1+end_pos*3)
         elif end_edge == 3:
             self.end_pos[1] += image_size[1]/20*(1+end_pos*3)
-            
+
         self.is_line = False
         if start_edge == 0 and end_edge == 1:
             self.start_angle, self.end_angle = self.set_angle(1)
@@ -222,7 +211,7 @@ class AreaInfo:
                     return [start_pos[0], center[1]]
                 elif start_angle == 90 or start_angle == 270:
                     return [center[0], start_pos[1]]
-        
+
 class MySimulator2:
     """
     ・観測のyaw方向のノイズを追加(回転させる)
@@ -246,15 +235,13 @@ class MySimulator2:
         for area in self.areas:
             if area.is_line:
                 init_pos_list.append([(area.start_pos[0]+area.end_pos[0])//2, (area.start_pos[1]+area.end_pos[1])//2])
-        #self.robot_pos = np.array([self.image_size[0]//2, self.image_size[1]//2]) # マップ中央に出現。評価用
         self.robot_pos = np.array(init_pos_list[np.random.randint(len(init_pos_list))], dtype=int)
         self.obs = None # 観測画像を保持する変数
         self.prior_pos = self.robot_pos
         self.prior_action = 0
         self.use_action_diff_reward = True # 進行方向との差ではなく，前回actioとの差を報酬として用いる。
         self.action_limit = 0.2 #0.25 # 進行方向を制限する 0.1なら+-18度。0.5以下に設定すること。
-        # この値を0.1で学習させた後で，0.2で追加学習というのも効果的かもしれない。
-        
+
     def check_edge(self, area_idx, edge):
         # self.areasの情報と照らし合わせつつ，エッジが利用可能かどうか調べる。
         grid = np.zeros([4,4]) # 4*4のグリッドを作成
@@ -343,9 +330,8 @@ class MySimulator2:
                     cv2.line(image, (int(area.line_edge[0]),int(area.line_edge[1])), (int(area.end_pos[0]),int(area.end_pos[1])), 0, line_thickness)
                 else:
                     cv2.line(image, (int(area.start_pos[0]),int(area.start_pos[1])), (int(area.line_edge[0]),int(area.line_edge[1])), 0, line_thickness)
-        # print('finish to generate map')
         return image
-    
+
     def calc_reward(self):
         """
         ３つ合わせて-1から1の範囲に収まるように調整すること。
@@ -359,7 +345,6 @@ class MySimulator2:
             reward += (0.5 - np.abs(self.action)**b) # -0.5~0.5の範囲
         # 2. 観測の黒ピクセルの平均座標と画像の中心座標の距離を一定値で割った値を報酬（罰則）とする
         if np.sum(self.obs[:,:,0] == 0) == 0:
-            # print('no black pixel')
             return -1
         else:
             black_pixels = np.where(self.obs[:,:,0] == 0) # 黒ピクセルの座標を取得
@@ -367,7 +352,6 @@ class MySimulator2:
             image_center = np.array([self.obs_size[0]//2, self.obs_size[1]//2]) # 画像の中心座標
             # 黒ピクセルの中心座標と画像の中心座標の距離を罰則とする
             reward += (0.5 - np.linalg.norm(black_center - image_center)/np.linalg.norm(image_center)) # -1~1の範囲
-        
         # rewardを-1から1の範囲に収める
         reward = np.clip(reward, -1, 1)
         return reward
@@ -387,7 +371,6 @@ class MySimulator2:
 
         # ロボットの位置を更新
         theta = (self.action_average + self.action*self.action_limit)*np.pi
-        # print(f"theta:{theta*180/np.pi}")
         new_pos = self.robot_pos + (self.max_length * np.array([np.cos(theta), np.sin(theta)])).astype(int)
         self.is_in_area = True # 画像の範囲内にいるかどうかを示すフラグ
         if 0 <= new_pos[0] < self.image_size[0] and 0 <= new_pos[1] < self.image_size[1]:
@@ -415,7 +398,7 @@ class MySimulator2:
         else:
             self.reward = -1
         return obs, self.reward
-    
+
     def render(self):
         """
         学習の進捗確認用の画像を生成する

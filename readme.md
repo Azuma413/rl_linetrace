@@ -103,7 +103,7 @@ ssh raspi3@raspi3.local
 sudo ~/my_env/bin/python3 ~/rl_linetrace/drqv2/main.py
 ```
 配線
-![image](images\DSC_0916.JPG)
+![image](images/DSC_0916.JPG)
 
 ### 評価(wsl2で実行)
 ```

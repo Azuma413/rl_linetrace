@@ -1,15 +1,9 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
 import hydra
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import utils
-
 
 class RandomShiftsAug(nn.Module):
     def __init__(self, pad):
@@ -54,7 +48,6 @@ class Encoder(nn.Module):
                                      nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.SiLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.SiLU())
-        # self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU()) # こいつを使うとモデルが巨大化する？
         self.apply(utils.weight_init)
 
     def forward(self, obs):
@@ -65,7 +58,6 @@ class Encoder(nn.Module):
         h = self.convnet(image)
         h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
         h = torch.cat([h, obs1, obs2], dim=-1)
-        # h = self.fcl(h)
         return h
 
 class EncoderV2(nn.Module):
@@ -79,7 +71,6 @@ class EncoderV2(nn.Module):
                                      nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 4, stride=1), # [(14 - 4)/1]+1 = 11
                                      nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 2, stride=1), # [(11 - 2)/1]+1 = 10
                                      nn.SiLU())
-        # self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU()) # こいつを使うとモデルが巨大化する？
         self.apply(utils.weight_init)
 
     def forward(self, obs):
@@ -90,7 +81,6 @@ class EncoderV2(nn.Module):
         h = self.convnet(image)
         h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
         h = torch.cat([h, obs1, obs2], dim=-1)
-        # h = self.fcl(h)
         return h
     
 class EncoderV3(nn.Module):
@@ -104,7 +94,6 @@ class EncoderV3(nn.Module):
                                      nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 4, stride=2), # [(14 - 4)/2]+1 = 6
                                      nn.SiLU(), nn.Conv2d(feature_dim, feature_dim, 2, stride=1), # [(6 - 2)/1]+1 = 5
                                      nn.SiLU())
-        # self.fcl = nn.Sequential(nn.Linear(convnet_output_dim + 2, self.repr_dim), nn.LayerNorm(self.repr_dim), nn.GELU()) # こいつを使うとモデルが巨大化する？
         self.apply(utils.weight_init)
 
     def forward(self, obs):
@@ -115,7 +104,6 @@ class EncoderV3(nn.Module):
         h = self.convnet(image)
         h = h.view(h.shape[0], -1) # バッチ次元以外をflattenにする。
         h = torch.cat([h, obs1, obs2], dim=-1)
-        # h = self.fcl(h)
         return h
 
 class Actor(nn.Module):
@@ -188,7 +176,6 @@ class DrQV2Agent:
         self.stddev_clip = stddev_clip
 
         # models
-        # self.encoder = Encoder(obs_shape).to(device)
         self.encoder = EncoderV3(obs_shape).to(device)
         self.actor = Actor(self.encoder.repr_dim, action_shape, feature_dim,
                            hidden_dim).to(device)
@@ -200,7 +187,6 @@ class DrQV2Agent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # optimizers
-        # AdamWにしてみる？
         self.encoder_opt = torch.optim.AdamW(self.encoder.parameters(), lr=lr)
         self.actor_opt = torch.optim.AdamW(self.actor.parameters(), lr=lr)
         self.critic_opt = torch.optim.AdamW(self.critic.parameters(), lr=lr)

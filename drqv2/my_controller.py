@@ -218,4 +218,3 @@ class MyController(gym.Env):
             is_last_chunk = (1 if i == total_chunks - 1 else 0).to_bytes(1, 'big')
             udp_packet = header + is_last_chunk + chunk
             self.udp_socket.sendto(udp_packet, self.address)
-            # print(f"send udp: {len(udp_packet)}")
