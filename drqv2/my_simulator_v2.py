@@ -287,7 +287,7 @@ class MySimulator2:
             return bfs(start, goal)
         else:
             return False
-    
+
     def image_generator(self, line_thickness=20):
         """
         mapの画像を生成する関数
